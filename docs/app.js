@@ -16,6 +16,7 @@ const els = {
   saveSettings: document.getElementById("save-settings"),
   settingsStatus: document.getElementById("settings-status"),
   globalStatus: document.getElementById("global-status"),
+  resetAllBtn: document.getElementById("reset-all-btn"),
 
   rollHistory: document.getElementById("roll-history"),
 
@@ -376,6 +377,19 @@ function setDamageKeepMode(mode) {
 els.damageKeepAll.addEventListener("click", () => setDamageKeepMode(""));
 els.damageKeepHigh.addEventListener("click", () => setDamageKeepMode("h"));
 els.damageKeepLow.addEventListener("click", () => setDamageKeepMode("l"));
+
+els.resetAllBtn.addEventListener("click", () => {
+  els.checkModifier.value = "+0";
+  els.checkAccuracy.value = "0";
+  els.checkDifficulty.value = "0";
+  els.damageD6.value = "";
+  els.damageD3.value = "";
+  els.damageFlat.value = "+0";
+  setDamageKeepMode("");
+  els.damageCrit.checked = false;
+  els.rollExpression.value = "";
+  setStatus(els.globalStatus, "", false);
+});
 
 els.damageD2Btn.addEventListener(
   "click",
