@@ -39,11 +39,9 @@ h1 {
   margin: 0;
 }
 
-.header-row {
+.reset-row {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  justify-content: center;
 }
 
 .reset-btn {
