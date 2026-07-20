@@ -164,6 +164,11 @@ select {
   font-weight: 600;
 }
 
+.dice-input {
+  width: 54px;
+  font-size: 13px;
+}
+
 .tally-input {
   width: 34px;
   padding: 4px 2px;

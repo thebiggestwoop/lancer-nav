@@ -32,8 +32,10 @@ const els = {
   checkRollBtn: document.getElementById("check-roll-btn"),
 
   damageD6: document.getElementById("damage-d6"),
+  damageD6Minus: document.getElementById("damage-d6-minus"),
   damageD6Add: document.getElementById("damage-d6-add"),
   damageD3: document.getElementById("damage-d3"),
+  damageD3Minus: document.getElementById("damage-d3-minus"),
   damageD3Add: document.getElementById("damage-d3-add"),
   damageFlat: document.getElementById("damage-flat"),
   damageFlatMinus: document.getElementById("damage-flat-minus"),
@@ -60,6 +62,17 @@ function parseModifier(raw) {
 
 function formatModifier(n) {
   return n >= 0 ? `+${n}` : `${n}`;
+}
+
+// The d6/d3 count fields show "" at zero and "Nd6"/"Nd3" otherwise, so the
+// field itself reads as dice notation instead of a bare count.
+function parseDiceCount(raw) {
+  const match = String(raw).match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function formatDiceCount(n, sides) {
+  return n > 0 ? `${n}d${sides}` : "";
 }
 
 function buildCheckExpression(modifier, accuracy, difficulty) {
@@ -316,12 +329,28 @@ els.checkRollBtn.addEventListener(
   })
 );
 
+els.damageD6Minus.addEventListener("click", () => {
+  els.damageD6.value = formatDiceCount(Math.max(0, parseDiceCount(els.damageD6.value) - 1), 6);
+});
+
 els.damageD6Add.addEventListener("click", () => {
-  els.damageD6.value = (Number(els.damageD6.value) || 0) + 1;
+  els.damageD6.value = formatDiceCount(parseDiceCount(els.damageD6.value) + 1, 6);
+});
+
+els.damageD6.addEventListener("blur", () => {
+  els.damageD6.value = formatDiceCount(parseDiceCount(els.damageD6.value), 6);
+});
+
+els.damageD3Minus.addEventListener("click", () => {
+  els.damageD3.value = formatDiceCount(Math.max(0, parseDiceCount(els.damageD3.value) - 1), 3);
 });
 
 els.damageD3Add.addEventListener("click", () => {
-  els.damageD3.value = (Number(els.damageD3.value) || 0) + 1;
+  els.damageD3.value = formatDiceCount(parseDiceCount(els.damageD3.value) + 1, 3);
+});
+
+els.damageD3.addEventListener("blur", () => {
+  els.damageD3.value = formatDiceCount(parseDiceCount(els.damageD3.value), 3);
 });
 
 els.damageFlatMinus.addEventListener("click", () => {
@@ -361,8 +390,8 @@ els.damageD2Btn.addEventListener(
 els.damageRollBtn.addEventListener(
   "click",
   withBusy(els.damageRollBtn, async () => {
-    const numD6 = Math.max(0, Number(els.damageD6.value) || 0);
-    const numD3 = Math.max(0, Number(els.damageD3.value) || 0);
+    const numD6 = parseDiceCount(els.damageD6.value);
+    const numD3 = parseDiceCount(els.damageD3.value);
     const flat = parseModifier(els.damageFlat.value);
     const crit = els.damageCrit.checked;
     const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit);

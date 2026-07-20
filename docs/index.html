@@ -71,16 +71,18 @@
     <div class="row xdx-controls-row">
       <div class="stat-group">
         <label for="damage-d6">d6</label>
-        <div class="tally-control">
-          <button id="damage-d6-add" class="tally-btn" type="button" aria-label="Add d6">+</button>
-          <input id="damage-d6" type="number" value="0" min="0" step="1" class="tally-input" />
+        <div class="modifier-control">
+          <button id="damage-d6-minus" class="step-btn" type="button" aria-label="Decrease d6">&minus;</button>
+          <input id="damage-d6" type="text" inputmode="numeric" value="" placeholder="0" class="modifier-input dice-input" />
+          <button id="damage-d6-add" class="step-btn" type="button" aria-label="Increase d6">+</button>
         </div>
       </div>
       <div class="stat-group">
         <label for="damage-d3">d3</label>
-        <div class="tally-control">
-          <button id="damage-d3-add" class="tally-btn" type="button" aria-label="Add d3">+</button>
-          <input id="damage-d3" type="number" value="0" min="0" step="1" class="tally-input" />
+        <div class="modifier-control">
+          <button id="damage-d3-minus" class="step-btn" type="button" aria-label="Decrease d3">&minus;</button>
+          <input id="damage-d3" type="text" inputmode="numeric" value="" placeholder="0" class="modifier-input dice-input" />
+          <button id="damage-d3-add" class="step-btn" type="button" aria-label="Increase d3">+</button>
         </div>
       </div>
       <div class="stat-group">
