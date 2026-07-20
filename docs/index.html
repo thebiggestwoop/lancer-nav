@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Lancer Companion</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Lancer Companion</h1>
+    <p id="global-status" class="status"></p>
+  </header>
+
+  <details id="settings-details">
+    <summary>Settings</summary>
+    <div class="field">
+      <label for="pairing-code">Pairing code</label>
+      <input id="pairing-code" type="text" placeholder="from l!link in Discord" />
+    </div>
+    <button id="save-settings">Save</button>
+    <p id="settings-status" class="status"></p>
+  </details>
+
+  <section class="card">
+    <h2>Roll History</h2>
+    <ul id="roll-history" class="roll-history"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Roll</h2>
+    <div class="field">
+      <label for="roll-expression">Expression</label>
+      <input id="roll-expression" type="text" placeholder="d20 + 3 a2   or   2d6 + 3 crit" />
+    </div>
+    <button id="roll-btn" class="btn-primary">Roll</button>
+  </section>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
