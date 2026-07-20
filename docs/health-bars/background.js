@@ -14,7 +14,18 @@ const BAR_PART_KINDS = ["bg", "fill", "text"];
 
 const menuEmbed = { url: "/health-bars/tracker-menu.html", height: 260 };
 
+// Feature is on hold -- flip this back to true to re-enable. Left false
+// (rather than removing background_url from the manifest) so this script
+// still runs once to sweep up any bar attachments a prior enabled session
+// already created as local scene items -- those don't clean themselves up
+// just because the script that made them stops running.
+const HEALTH_BARS_ENABLED = false;
+
 async function init() {
+  if (!HEALTH_BARS_ENABLED) {
+    await runCleanupWhenReady();
+    return;
+  }
   registerContextMenus();
   await initOnMapBars();
 }
@@ -23,6 +34,24 @@ if (OBR.isReady) {
   init();
 } else {
   OBR.onReady(init);
+}
+
+async function runCleanupWhenReady() {
+  // Runs on every scene-ready transition (including switching scenes within
+  // the same room), not just once, so a stale-bar cleanup can't be missed
+  // just because a scene wasn't loaded yet when this script started.
+  OBR.scene.onReadyChange(async (isReady) => {
+    if (isReady) await cleanUpAllBars();
+  });
+  if (await OBR.scene.isReady()) await cleanUpAllBars();
+}
+
+async function cleanUpAllBars() {
+  const items = await OBR.scene.items.getItems(
+    (item) => (item.layer === "CHARACTER" || item.layer === "MOUNT") && item.type === "IMAGE",
+  );
+  const deleteIds = items.flatMap((item) => allBarPartIdsForItem(item.id));
+  await OBR.scene.local.deleteItems(deleteIds);
 }
 
 function registerContextMenus() {
