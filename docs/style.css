@@ -174,6 +174,8 @@ select {
   width: 40px;
   height: 40px;
   padding: 0;
+  font-size: 20px;
+  line-height: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -187,10 +189,6 @@ select {
 
 .tally-btn:hover .tally-icon {
   color: var(--accent);
-}
-
-.text-tally-btn {
-  font-size: 12px;
 }
 
 .xdx-controls-row {
