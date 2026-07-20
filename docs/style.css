@@ -87,13 +87,37 @@ summary {
   opacity: 0.8;
 }
 
-input {
+input,
+select {
   border: 1px solid var(--border);
   border-radius: 4px;
   padding: 4px 6px;
   background: var(--bg);
   color: var(--fg);
   width: 100%;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  margin: 6px 0;
+  cursor: pointer;
+}
+
+.checkbox-field input {
+  width: auto;
 }
 
 button {

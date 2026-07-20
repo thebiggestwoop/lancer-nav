@@ -21,7 +21,56 @@ const els = {
 
   rollExpression: document.getElementById("roll-expression"),
   rollBtn: document.getElementById("roll-btn"),
+
+  checkModifier: document.getElementById("check-modifier"),
+  checkAccuracy: document.getElementById("check-accuracy"),
+  checkDifficulty: document.getElementById("check-difficulty"),
+  checkRollBtn: document.getElementById("check-roll-btn"),
+
+  damageD6: document.getElementById("damage-d6"),
+  damageD3: document.getElementById("damage-d3"),
+  damageFlat: document.getElementById("damage-flat"),
+  damageKeepMode: document.getElementById("damage-keep-mode"),
+  damageKeepCount: document.getElementById("damage-keep-count"),
+  damageCrit: document.getElementById("damage-crit"),
+  damageRollBtn: document.getElementById("damage-roll-btn"),
 };
+
+// The structured Check/Damage forms don't talk to the backend directly --
+// they build the same expression string the Discord `l!r` command and the
+// Advanced text box produce, then send it through the one /roll endpoint.
+// That keeps the parsing/validation logic in exactly one place (lancer_logic.py).
+function buildCheckExpression(modifier, accuracy, difficulty) {
+  const parts = ["d20"];
+  if (modifier) {
+    parts.push(modifier > 0 ? `+ ${modifier}` : `- ${Math.abs(modifier)}`);
+  }
+  if (accuracy > 0) parts.push(`a${accuracy}`);
+  if (difficulty > 0) parts.push(`d${difficulty}`);
+  return parts.join(" ");
+}
+
+function buildDamageExpression(numD6, keepMode, keepCount, numD3, flat, crit) {
+  const diceParts = [];
+  if (numD6 > 0) {
+    diceParts.push(keepMode ? `${numD6}d6k${keepMode}${keepCount}` : `${numD6}d6`);
+  }
+  if (numD3 > 0) {
+    diceParts.push(`${numD3}d3`);
+  }
+  if (diceParts.length === 0 && !flat) {
+    throw new Error("Enter at least one die or a flat bonus.");
+  }
+  let expr = diceParts.join(" + ");
+  if (flat) {
+    const sign = flat > 0 ? "+" : "-";
+    expr = expr ? `${expr} ${sign} ${Math.abs(flat)}` : `${flat}`;
+  }
+  if (crit) {
+    expr = expr ? `${expr} crit` : "crit";
+  }
+  return expr;
+}
 
 let pairingCode = "";
 let playerName = "Someone";
@@ -176,6 +225,37 @@ els.rollBtn.addEventListener(
     if (!expression) {
       throw new Error("Enter a roll expression first.");
     }
+    await postJson(`/api/${pairingCode}/roll`, {
+      expression,
+      player_name: playerName,
+    });
+  })
+);
+
+els.checkRollBtn.addEventListener(
+  "click",
+  withBusy(els.checkRollBtn, async () => {
+    const modifier = Number(els.checkModifier.value) || 0;
+    const accuracy = Math.max(0, Number(els.checkAccuracy.value) || 0);
+    const difficulty = Math.max(0, Number(els.checkDifficulty.value) || 0);
+    const expression = buildCheckExpression(modifier, accuracy, difficulty);
+    await postJson(`/api/${pairingCode}/roll`, {
+      expression,
+      player_name: playerName,
+    });
+  })
+);
+
+els.damageRollBtn.addEventListener(
+  "click",
+  withBusy(els.damageRollBtn, async () => {
+    const numD6 = Math.max(0, Number(els.damageD6.value) || 0);
+    const numD3 = Math.max(0, Number(els.damageD3.value) || 0);
+    const flat = Number(els.damageFlat.value) || 0;
+    const keepMode = els.damageKeepMode.value || null;
+    const keepCount = Math.max(1, Number(els.damageKeepCount.value) || 1);
+    const crit = els.damageCrit.checked;
+    const expression = buildDamageExpression(numD6, keepMode, keepCount, numD3, flat, crit);
     await postJson(`/api/${pairingCode}/roll`, {
       expression,
       player_name: playerName,

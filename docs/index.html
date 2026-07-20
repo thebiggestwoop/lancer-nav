@@ -27,13 +27,69 @@
   </section>
 
   <section class="card">
-    <h2>Roll</h2>
+    <h2>Check Roll</h2>
+    <div class="row">
+      <div class="field">
+        <label for="check-modifier">Modifier</label>
+        <input id="check-modifier" type="number" value="0" step="1" />
+      </div>
+      <div class="field">
+        <label for="check-accuracy">Accuracy</label>
+        <input id="check-accuracy" type="number" value="0" min="0" step="1" />
+      </div>
+      <div class="field">
+        <label for="check-difficulty">Difficulty</label>
+        <input id="check-difficulty" type="number" value="0" min="0" step="1" />
+      </div>
+    </div>
+    <button id="check-roll-btn" class="btn-primary">Roll Check</button>
+  </section>
+
+  <section class="card">
+    <h2>Damage Roll</h2>
+    <div class="row">
+      <div class="field">
+        <label for="damage-d6">d6</label>
+        <input id="damage-d6" type="number" value="1" min="0" step="1" />
+      </div>
+      <div class="field">
+        <label for="damage-d3">d3</label>
+        <input id="damage-d3" type="number" value="0" min="0" step="1" />
+      </div>
+      <div class="field">
+        <label for="damage-flat">Flat</label>
+        <input id="damage-flat" type="number" value="0" step="1" />
+      </div>
+    </div>
+    <div class="row">
+      <div class="field">
+        <label for="damage-keep-mode">Keep (d6 only)</label>
+        <select id="damage-keep-mode">
+          <option value="">All</option>
+          <option value="h">Highest</option>
+          <option value="l">Lowest</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="damage-keep-count">Keep count</label>
+        <input id="damage-keep-count" type="number" value="1" min="1" step="1" />
+      </div>
+    </div>
+    <label class="checkbox-field">
+      <input id="damage-crit" type="checkbox" />
+      Crit (roll twice, keep higher)
+    </label>
+    <button id="damage-roll-btn" class="btn-primary">Roll Damage</button>
+  </section>
+
+  <details id="advanced-details">
+    <summary>Advanced: type an expression</summary>
     <div class="field">
       <label for="roll-expression">Expression</label>
       <input id="roll-expression" type="text" placeholder="d20 + 3 a2   or   2d6 + 3 crit" />
     </div>
-    <button id="roll-btn" class="btn-primary">Roll</button>
-  </section>
+    <button id="roll-btn">Roll</button>
+  </details>
 
   <script type="module" src="app.js"></script>
 </body>
