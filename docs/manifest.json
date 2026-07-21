@@ -5,7 +5,6 @@
   "icon": "/icon.svg",
   "author": "You",
   "description": "Roll Lancer d20 checks and damage dice, and post results to Discord.",
-  "background_url": "/health-bars/background.html",
   "action": {
     "title": "Lancer",
     "icon": "/icon.svg",
