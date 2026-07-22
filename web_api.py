@@ -88,6 +88,12 @@ def create_app(bot, pairing_codes):
         text = ll.format_roll_discord(result)
 
         channel = await _get_channel(bot, pairing["channel_id"])
+
+        # Sent emoji-only (no text) so Discord renders the dice faces at
+        # large size -- matches the l!r Discord command's own behavior.
+        for chunk in ll.roll_emoji_chunks(result):
+            await channel.send(chunk)
+
         await channel.send(f"{_attribution(actor)}\n{text}")
 
         event_bus.publish(pairing["guild_id"], {

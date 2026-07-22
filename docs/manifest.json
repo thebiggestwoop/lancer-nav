@@ -2,7 +2,7 @@
   "name": "Lancer Companion",
   "version": "0.1.0",
   "manifest_version": 1,
-  "icon": "/icon.svg",
+  "icon": "/lancer-companion-logo.png",
   "author": "thebiggestwoop",
   "description": "Roll Lancer d20 checks and damage dice, and post results to Discord.",
   "action": {

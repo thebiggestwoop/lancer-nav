@@ -1,4 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-  <rect x="2" y="2" width="20" height="20" rx="4" fill="#2f6fed" stroke="#1a2b4a" stroke-width="1"/>
-  <text x="12" y="16.5" font-size="11" font-family="Segoe UI, Arial, sans-serif" font-weight="bold" fill="#ffffff" text-anchor="middle">L</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" id="icon">
+  <ellipse cx="18" cy="21" rx="13" ry="12" fill="#1c1626" />
+  <path d="M6,20 Q1,10 8,5 L13,10 Q9,15 10,21 Z" fill="#2e7d4f" />
+  <path d="M30,20 Q35,10 28,5 L23,10 Q27,15 26,21 Z" fill="#2e7d4f" />
+  <ellipse cx="13" cy="13" rx="4.2" ry="5.2" fill="#050505" />
+  <ellipse cx="23" cy="13" rx="4.2" ry="5.2" fill="#050505" />
+  <circle cx="12" cy="10.5" r="1.1" fill="#ffffff" />
+  <circle cx="22" cy="10.5" r="1.1" fill="#ffffff" />
 </svg>
