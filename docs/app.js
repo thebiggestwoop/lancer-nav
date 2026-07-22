@@ -138,6 +138,54 @@ function formatRollTime(epochSeconds) {
   });
 }
 
+// Same face art the Discord bot posts as custom emoji, reused here as icons.
+const D20_ICONS = Object.fromEntries(
+  Array.from({ length: 20 }, (_, i) => [i + 1, `icons/d20_${i + 1}.png`])
+);
+const D6_ICONS = Object.fromEntries(
+  Array.from({ length: 6 }, (_, i) => [i + 1, `icons/d6_${i + 1}.png`])
+);
+
+// Mirrors lancer_logic.py's roll_emoji_chunks(): every die rolled by one
+// command -- the d20 plus any Accuracy/Difficulty bonus d6s for a check, or
+// every term's dice (both attempts, if a crit rolled twice) for a damage
+// roll -- as a flat list of {sides, value}. d3/d2 dice use the d6 art too,
+// since their faces (1-3, 1-2) are always within d6's 1-6 range.
+function rollDiceFaces(event) {
+  if (event.mode === "check") {
+    const faces = [{ sides: 20, value: event.d20 }];
+    (event.bonus_dice || []).forEach((value) => faces.push({ sides: 6, value }));
+    return faces;
+  }
+  if (event.mode === "damage") {
+    const faces = [];
+    (event.attempts || []).forEach((attempt) => {
+      (attempt.rolls_by_term || []).forEach(([sides, rolls]) => {
+        rolls.forEach((value) => faces.push({ sides, value }));
+      });
+    });
+    return faces;
+  }
+  return [];
+}
+
+function buildDiceFacesRow(faces) {
+  const row = document.createElement("div");
+  row.className = "dice-faces";
+  faces.forEach(({ sides, value }) => {
+    const src = (sides === 20 ? D20_ICONS : D6_ICONS)[value];
+    if (!src) {
+      return;
+    }
+    const img = document.createElement("img");
+    img.src = src;
+    img.alt = String(value);
+    img.className = "dice-face-icon";
+    row.appendChild(img);
+  });
+  return row;
+}
+
 // event.text is the Discord-formatted string the bot posts, which only ever
 // uses **bold** and ~~strikethrough~~. Rendered by building real DOM nodes
 // (never innerHTML) so nothing in the text can be parsed as HTML.
@@ -186,6 +234,10 @@ function addHistoryEntry(event) {
   appendLiteMarkdown(line2, event.text);
 
   li.appendChild(line1);
+  const faces = rollDiceFaces(event);
+  if (faces.length) {
+    li.appendChild(buildDiceFacesRow(faces));
+  }
   li.appendChild(line2);
 
   els.rollHistory.appendChild(li);

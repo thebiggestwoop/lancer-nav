@@ -367,3 +367,15 @@ button:disabled {
   white-space: pre-wrap;
   margin-top: 2px;
 }
+
+.dice-faces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin: 2px 0;
+}
+
+.dice-face-icon {
+  width: 36px;
+  height: 36px;
+}
