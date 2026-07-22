@@ -146,25 +146,26 @@ const D6_ICONS = Object.fromEntries(
   Array.from({ length: 6 }, (_, i) => [i + 1, `icons/d6_${i + 1}.png`])
 );
 
-// Mirrors lancer_logic.py's roll_emoji_chunks(): every die rolled by one
-// command -- the d20 plus any Accuracy/Difficulty bonus d6s for a check, or
-// every term's dice (both attempts, if a crit rolled twice) for a damage
-// roll -- as a flat list of {sides, value}. d3/d2 dice use the d6 art too,
-// since their faces (1-3, 1-2) are always within d6's 1-6 range.
-function rollDiceFaces(event) {
+// Mirrors lancer_logic.py's roll_emoji_chunks(): one row of {sides, value}
+// per line the Discord bot would send -- a single row for a check (the d20
+// plus any Accuracy/Difficulty bonus d6s), or one row per damage attempt
+// (two rows for a crit, since it rolls twice and each reroll gets its own
+// line). d3/d2 dice use the d6 art too, since their faces (1-3, 1-2) are
+// always within d6's 1-6 range.
+function rollDiceFaceRows(event) {
   if (event.mode === "check") {
-    const faces = [{ sides: 20, value: event.d20 }];
-    (event.bonus_dice || []).forEach((value) => faces.push({ sides: 6, value }));
-    return faces;
+    const row = [{ sides: 20, value: event.d20 }];
+    (event.bonus_dice || []).forEach((value) => row.push({ sides: 6, value }));
+    return [row];
   }
   if (event.mode === "damage") {
-    const faces = [];
-    (event.attempts || []).forEach((attempt) => {
+    return (event.attempts || []).map((attempt) => {
+      const row = [];
       (attempt.rolls_by_term || []).forEach(([sides, rolls]) => {
-        rolls.forEach((value) => faces.push({ sides, value }));
+        rolls.forEach((value) => row.push({ sides, value }));
       });
+      return row;
     });
-    return faces;
   }
   return [];
 }
@@ -234,10 +235,9 @@ function addHistoryEntry(event) {
   appendLiteMarkdown(line2, event.text);
 
   li.appendChild(line1);
-  const faces = rollDiceFaces(event);
-  if (faces.length) {
-    li.appendChild(buildDiceFacesRow(faces));
-  }
+  rollDiceFaceRows(event)
+    .filter((row) => row.length > 0)
+    .forEach((row) => li.appendChild(buildDiceFacesRow(row)));
   li.appendChild(line2);
 
   els.rollHistory.appendChild(li);
