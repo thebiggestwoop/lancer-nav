@@ -300,21 +300,27 @@ def _chunk_emoji_string(emoji_string):
 
 def roll_emoji_chunks(result):
     """All the dice from one roll -- the d20 AND any Accuracy/Difficulty
-    bonus d6s for a check, or every term's dice (plus both attempts, if a
-    crit rolled twice) for a damage roll -- as a single emoji string, split
-    into Discord-message-sized chunks. Everything from one command lands
-    in the same message line instead of one message per die type."""
+    bonus d6s for a check, or every term's dice for a damage roll -- as a
+    single emoji string, split into Discord-message-sized chunks. Everything
+    from one command lands in the same message rather than one message per
+    die type. A crit rolls twice, so its two attempts get one row each,
+    separated by a linebreak, so the two rerolls read as distinct rows
+    instead of one long unbroken string."""
     if result["mode"] == "check":
         emojis = [d20_emojis[result["d20"]]]
         emojis.extend(d6_emojis[roll] for roll in result["bonus_dice"])
+        emoji_string = "".join(emojis)
     else:
-        emojis = [
-            _die_emoji(sides, roll)
+        attempt_rows = [
+            "".join(
+                _die_emoji(sides, roll)
+                for sides, rolls, _ in attempt["rolls_by_term"]
+                for roll in rolls
+            )
             for attempt in result["attempts"]
-            for sides, rolls, _ in attempt["rolls_by_term"]
-            for roll in rolls
         ]
-    return _chunk_emoji_string("".join(emojis))
+        emoji_string = "\n".join(attempt_rows)
+    return _chunk_emoji_string(emoji_string)
 
 
 def _signed(value):
