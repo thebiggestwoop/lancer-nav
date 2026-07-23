@@ -1,8 +1,8 @@
 """Pure game-logic core for Lancer dice mechanics: the d20 + Accuracy/
-Difficulty roll, and dice-pool damage rolls (including the roll-twice-
-keep-higher crit damage rule and hand-typed "kh"/"kl" keep-N-of-M dice) --
-plus a small parser so a single command can accept either kind of roll
-and tell them apart.
+Difficulty roll, and dice-pool damage rolls (including the crit rule --
+double each damage term's dice and keep the top results -- and hand-typed
+"kh"/"kl" keep-N-of-M dice) -- plus a small parser so a single command can
+accept either kind of roll and tell them apart.
 
 No Discord or web-framework dependency here, on purpose -- mirrors the
 Ascension bot's game_logic.py so both a Discord bot and (later) an Owlbear
@@ -30,24 +30,47 @@ class LancerError(Exception):
 # Rolling
 # ---------------------------------------------------------------------------
 
-def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None):
+def _roll_die_with_overkill(sides):
+    """Rolls one die, rerolling on a 1 (each 1 rolled -- including the ones
+    that trigger further rerolls -- costs 1 Heat). Returns (final_face, heat)."""
+    heat = 0
+    face = random.randint(1, sides)
+    while face == 1:
+        heat += 1
+        face = random.randint(1, sides)
+    return face, heat
+
+
+def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=False):
     """Rolls `count` dice of `sides`, optionally keeping only the highest
     ("h") or lowest ("l") `keep_count` of them (keep_mode=None keeps all,
     i.e. a normal sum). Accuracy/Difficulty's "roll N d6, keep the highest"
     and hand-typed "XdYkhN"/"XdYklN" damage dice are the same mechanic --
     this is the one implementation both roll_d20_check and roll_damage use.
 
-    Returns (rolls, kept_indices, total) -- kept_indices is a set of
+    overkill=True applies the Overkill weapon tag: any die that lands on a
+    1 costs 1 Heat and is rerolled (additional 1s keep triggering it).
+
+    Returns (rolls, kept_indices, total, heat) -- kept_indices is a set of
     indices into `rolls` so callers can show which dice were dropped.
     """
-    rolls = [random.randint(1, sides) for _ in range(count)]
+    if overkill:
+        rolls = []
+        heat = 0
+        for _ in range(count):
+            face, die_heat = _roll_die_with_overkill(sides)
+            rolls.append(face)
+            heat += die_heat
+    else:
+        rolls = [random.randint(1, sides) for _ in range(count)]
+        heat = 0
     if keep_mode is None:
         kept_indices = set(range(len(rolls)))
     else:
         order = sorted(range(len(rolls)), key=lambda i: rolls[i], reverse=(keep_mode == "h"))
         kept_indices = set(order[:keep_count])
     total = sum(rolls[i] for i in kept_indices)
-    return rolls, kept_indices, total
+    return rolls, kept_indices, total, heat
 
 
 def roll_d20_check(modifier, accuracy=0, difficulty=0):
@@ -70,7 +93,7 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
     kept_indices = set()
     bonus = 0
     if net != 0:
-        bonus_dice, kept_indices, kept_sum = _roll_kept_dice(abs(net), 6, "h", 1)
+        bonus_dice, kept_indices, kept_sum, _ = _roll_kept_dice(abs(net), 6, "h", 1)
         bonus = kept_sum if net > 0 else -kept_sum
 
     total = d20_roll + modifier + bonus
@@ -88,25 +111,49 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
     }
 
 
-def _roll_damage_once(dice_terms, flat):
+def _roll_damage_once(dice_terms, flat, overkill=False):
     rolls_by_term = []  # (sides, rolls, kept_indices) per term, in order
     total = flat
+    heat = 0
     for count, sides, keep_mode, keep_count in dice_terms:
-        rolls, kept_indices, kept_sum = _roll_kept_dice(count, sides, keep_mode, keep_count)
+        rolls, kept_indices, kept_sum, die_heat = _roll_kept_dice(
+            count, sides, keep_mode, keep_count, overkill
+        )
         rolls_by_term.append((sides, rolls, kept_indices))
         total += kept_sum
-    return {"rolls_by_term": rolls_by_term, "flat": flat, "total": total}
+        heat += die_heat
+    return {"rolls_by_term": rolls_by_term, "flat": flat, "total": total, "heat": heat}
 
 
-def roll_damage(dice_terms, flat=0, crit=False):
+def _crit_term(term):
+    """Transforms one (count, sides, keep_mode, keep_count) damage term for
+    a critical hit: "all damage dice are rolled twice ... and the highest
+    result from each source of damage is used" -- e.g. a plain 2d6 term
+    becomes "roll 4d6, keep the highest 2", not two independent 2d6 rolls
+    summed and compared. A term that already has an explicit hand-typed
+    keep (khN/klN) doubles the same way, keeping that same explicit N of
+    the doubled pool."""
+    count, sides, keep_mode, keep_count = term
+    if keep_mode is None:
+        return (count * 2, sides, "h", count)
+    return (count * 2, sides, keep_mode, keep_count)
+
+
+def roll_damage(dice_terms, flat=0, crit=False, overkill=False):
     """dice_terms is a list of (count, sides, keep_mode, keep_count) tuples
     -- keep_mode/keep_count are None for a plain sum-all-the-dice term, or
     ("h"|"l", n) style values for a hand-typed "khN"/"klN" term. E.g.
     [(2, 6, None, None), (1, 3, None, None)] for 2d6 + 1d3, or
     [(4, 6, "h", 2)] for 4d6kh2.
 
-    If crit is True, rolls the whole expression twice and keeps the higher
-    total (the Lancer crit-damage rule), returning both attempts."""
+    If crit is True, doubles each term's dice and keeps only the top
+    results (see _crit_term) -- the Lancer crit-damage rule -- as a single
+    roll, rather than rolling the whole expression twice.
+
+    If overkill is True, applies the Overkill weapon tag to every damage
+    die actually rolled (including the doubled crit pool, and any of its
+    dropped dice): each 1 rolled costs 1 Heat and is rerolled, with further
+    1s continuing to trigger it."""
     for count, sides, keep_mode, keep_count in dice_terms:
         if count < 0:
             raise LancerError("Number of dice must be zero or positive.")
@@ -117,13 +164,20 @@ def roll_damage(dice_terms, flat=0, crit=False):
     if not any(count > 0 for count, _, _, _ in dice_terms) and flat == 0:
         raise LancerError("Enter at least one die or a flat bonus.")
 
-    attempt_1 = _roll_damage_once(dice_terms, flat)
-    if not crit:
-        return {"mode": "damage", "crit": False, "attempts": [attempt_1], "total": attempt_1["total"]}
+    effective_terms = [_crit_term(t) for t in dice_terms] if crit else dice_terms
+    for count, sides, keep_mode, keep_count in effective_terms:
+        if count > MAX_DAMAGE_DICE:
+            raise LancerError(f"Number of dice must be at most {MAX_DAMAGE_DICE}, even doubled for a crit.")
 
-    attempt_2 = _roll_damage_once(dice_terms, flat)
-    kept_total = max(attempt_1["total"], attempt_2["total"])
-    return {"mode": "damage", "crit": True, "attempts": [attempt_1, attempt_2], "total": kept_total}
+    attempt = _roll_damage_once(effective_terms, flat, overkill)
+    return {
+        "mode": "damage",
+        "crit": crit,
+        "overkill": overkill,
+        "attempts": [attempt],
+        "total": attempt["total"],
+        "heat": attempt["heat"],
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -138,8 +192,9 @@ _ACCURACY_TOKEN_RE = re.compile(r"^a(\d*)$", re.IGNORECASE)
 
 def parse_roll_expression(expr):
     """Parses a roll expression like "d20 + 3 a2" (check: +3 modifier, 2
-    Accuracy), "2d6 + 3 crit" (damage: 2d6+3, crit), or "4d6kh2 + 3"
-    (damage: roll 4d6, keep the highest 2, +3).
+    Accuracy), "2d6 + 3 crit" (damage: 2d6+3, crit), "4d6kh2 + 3"
+    (damage: roll 4d6, keep the highest 2, +3), or "2d6 overkill" (damage:
+    2d6, Overkill weapon tag).
 
     Whether "d20" appears anywhere determines the mode. In damage
     expressions, dice are always written with an explicit die type that's
@@ -155,6 +210,7 @@ def parse_roll_expression(expr):
     accuracy_total = 0
     flat_total = 0
     crit = False
+    overkill = False
     unrecognized = []
 
     for sign, word in tokens:
@@ -184,6 +240,10 @@ def parse_roll_expression(expr):
             crit = True
             continue
 
+        if word.lower() == "overkill":
+            overkill = True
+            continue
+
         if word.isdigit():
             flat_total += signed * int(word)
             continue
@@ -211,6 +271,7 @@ def parse_roll_expression(expr):
         "dice_terms": other_dice_terms,
         "flat": flat_total,
         "crit": crit,
+        "overkill": overkill,
     }
 
 
@@ -221,7 +282,7 @@ def perform_roll(expr):
     parsed = parse_roll_expression(expr)
     if parsed["mode"] == "check":
         return roll_d20_check(parsed["modifier"], parsed["accuracy"], parsed["difficulty"])
-    return roll_damage(parsed["dice_terms"], parsed["flat"], parsed["crit"])
+    return roll_damage(parsed["dice_terms"], parsed["flat"], parsed["crit"], parsed["overkill"])
 
 
 def result_to_json_safe(result):
@@ -332,12 +393,11 @@ def _chunk_emoji_string(emoji_string):
 
 def roll_emoji_chunks(result):
     """All the dice from one roll -- the d20 AND any Accuracy/Difficulty
-    bonus d6s for a check, or every term's dice for a damage roll -- as a
+    bonus d6s for a check, or every term's dice for a damage roll (crit or
+    not -- a crit just means each term's dice pool was doubled) -- as a
     single emoji string, split into Discord-message-sized chunks. Everything
     from one command lands in the same message rather than one message per
-    die type. A crit rolls twice, so its two attempts get one row each,
-    separated by a linebreak, so the two rerolls read as distinct rows
-    instead of one long unbroken string."""
+    die type."""
     if result["mode"] == "check":
         emojis = [d20_emojis[result["d20"]]]
         emojis.extend(d6_emojis[roll] for roll in result["bonus_dice"])
@@ -400,16 +460,14 @@ def _describe_damage_attempt(attempt):
 
 
 def format_damage_discord(result):
-    if not result["crit"]:
-        equation = _describe_damage_attempt(result["attempts"][0])
-        return f"**Result:** {equation}\n**Total:** {result['total']}"
+    equation = _describe_damage_attempt(result["attempts"][0])
+    total_line = f"**Total:** {result['total']}"
+    if result["crit"]:
+        total_line += " -- CRIT!"
 
-    attempt_1, attempt_2 = result["attempts"]
-    lines = [
-        f"**Roll 1:** {_describe_damage_attempt(attempt_1)} = {attempt_1['total']}",
-        f"**Roll 2:** {_describe_damage_attempt(attempt_2)} = {attempt_2['total']}",
-        f"**Total (kept higher):** {result['total']}",
-    ]
+    lines = [f"**Result:** {equation}", total_line]
+    if result.get("overkill"):
+        lines.append(f"**Overkill:** {result['heat']} Heat")
     return "\n".join(lines)
 
 

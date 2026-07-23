@@ -79,7 +79,8 @@ async def help_command(ctx):
         "**Bot Commands:**\n\n"
         "**l!r <expression>** - Rolls a d20 check or a damage roll, auto-detecting which:\n"
         "- Check: `l!r d20 + 3 a2` -- d20 + modifier, `aN` for Accuracy, `dN` for Difficulty (they cancel 1-for-1). Total of 20+ is a crit.\n"
-        "- Damage: `l!r 2d6 + 3` or `l!r 2d6 + 1d3 + 3 crit` -- dice + flat bonus; `crit` rolls twice and keeps the higher total. Also accepts hand-typed `XdYkhN`/`XdYklN` (keep highest/lowest N of X).\n"
+        "- Damage: `l!r 2d6 + 3` or `l!r 2d6 + 1d3 + 3 crit` -- dice + flat bonus; `crit` doubles each damage term's dice and keeps the top results (e.g. 2d6 becomes 4d6, keep highest 2). Also accepts hand-typed `XdYkhN`/`XdYklN` (keep highest/lowest N of X).\n"
+        "- `overkill` -- e.g. `l!r 2d6 overkill` -- any die that lands on a 1 costs 1 Heat and is rerolled (further 1s keep triggering it); the total Heat taken is reported.\n"
         "**l!link** - Generates a code to link this channel to the Owlbear extension.\n"
     )
     await ctx.send(help_text)

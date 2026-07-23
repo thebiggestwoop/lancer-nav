@@ -9,7 +9,7 @@
     "title": "Lancer",
     "icon": "/icon.svg",
     "popover": "/index.html",
-    "height": 700,
+    "height": 800,
     "width": 340
   }
 }

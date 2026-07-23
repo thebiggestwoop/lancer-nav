@@ -31,6 +31,9 @@ const els = {
   checkDifficulty: document.getElementById("check-difficulty"),
   checkDifficultyAdd: document.getElementById("check-difficulty-add"),
   checkRollBtn: document.getElementById("check-roll-btn"),
+  savedRollsSelect: document.getElementById("saved-rolls-select"),
+  saveRollBtn: document.getElementById("save-roll-btn"),
+  deleteRollBtn: document.getElementById("delete-roll-btn"),
 
   damageD6: document.getElementById("damage-d6"),
   damageD6Minus: document.getElementById("damage-d6-minus"),
@@ -45,6 +48,7 @@ const els = {
   damageKeepHigh: document.getElementById("damage-keep-high"),
   damageKeepLow: document.getElementById("damage-keep-low"),
   damageCrit: document.getElementById("damage-crit"),
+  damageOverkill: document.getElementById("damage-overkill"),
   damageD2Btn: document.getElementById("damage-d2-btn"),
   damageRollBtn: document.getElementById("damage-roll-btn"),
 };
@@ -90,7 +94,7 @@ function buildCheckExpression(modifier, accuracy, difficulty) {
 // dice in them -- e.g. 2d6 + 1d3 with Keep: High keeps the highest of the
 // 2d6 *and* the highest of the 1d3 (trivially itself), not a single winner
 // picked across the combined pool.
-function buildDamageExpression(numD6, numD3, flat, keepMode, crit) {
+function buildDamageExpression(numD6, numD3, flat, keepMode, crit, overkill) {
   const diceParts = [];
   if (numD6 > 0) {
     diceParts.push(keepMode ? `${numD6}d6k${keepMode}1` : `${numD6}d6`);
@@ -108,6 +112,9 @@ function buildDamageExpression(numD6, numD3, flat, keepMode, crit) {
   }
   if (crit) {
     expr = expr ? `${expr} crit` : "crit";
+  }
+  if (overkill) {
+    expr = expr ? `${expr} overkill` : "overkill";
   }
   return expr;
 }
@@ -148,10 +155,10 @@ const D6_ICONS = Object.fromEntries(
 
 // Mirrors lancer_logic.py's roll_emoji_chunks(): one row of {sides, value}
 // per line the Discord bot would send -- a single row for a check (the d20
-// plus any Accuracy/Difficulty bonus d6s), or one row per damage attempt
-// (two rows for a crit, since it rolls twice and each reroll gets its own
-// line). d3/d2 dice use the d6 art too, since their faces (1-3, 1-2) are
-// always within d6's 1-6 range.
+// plus any Accuracy/Difficulty bonus d6s), or one row of every term's dice
+// for a damage roll (crit or not -- a crit just doubles each term's dice
+// pool, it's still one roll). d3/d2 dice use the d6 art too, since their
+// faces (1-3, 1-2) are always within d6's 1-6 range.
 function rollDiceFaceRows(event) {
   if (event.mode === "check") {
     const row = [{ sides: 20, value: event.d20 }];
@@ -380,8 +387,116 @@ els.checkRollBtn.addEventListener(
       expression,
       player_name: playerName,
     });
+    // Clear the saved-roll selection once it's actually been rolled, so
+    // picking the same saved roll again afterward fires a fresh "change"
+    // event instead of silently no-oping (browsers only fire "change" when
+    // the picked value differs from before).
+    els.savedRollsSelect.value = "";
   })
 );
+
+// Saved rolls -- purely a client-side convenience (kept in this browser's
+// localStorage, never synced through the backend/Discord), so a player can
+// re-populate the d20 check fields for an attack they use often without
+// re-entering Modifier/Accuracy/Difficulty by hand every time.
+const SAVED_ROLLS_STORAGE_KEY = "lancer-companion-saved-d20-rolls";
+
+function loadSavedRolls() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_ROLLS_STORAGE_KEY));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+let savedRolls = loadSavedRolls();
+
+// <option> text can't mix font-weights (no HTML/CSS support inside options),
+// so "bold" is faked with the Unicode mathematical sans-serif bold
+// letter/digit block -- visually bold and sans-serif in effectively every
+// font, still plain text underneath.
+function toBoldUnicode(text) {
+  return String(text).replace(/[A-Za-z0-9]/g, (ch) => {
+    const code = ch.codePointAt(0);
+    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1d5d4 + (code - 65));
+    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1d5ee + (code - 97));
+    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1d7ec + (code - 48));
+    return ch;
+  });
+}
+
+// Same trick, but the Unicode mathematical monospace block, for the dice
+// expression following the name.
+function toMonospaceUnicode(text) {
+  return String(text).replace(/[A-Za-z0-9]/g, (ch) => {
+    const code = ch.codePointAt(0);
+    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1d670 + (code - 65));
+    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1d68a + (code - 97));
+    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1d7f6 + (code - 48));
+    return ch;
+  });
+}
+
+function renderSavedRolls(selectedName) {
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Saved rolls...";
+
+  const options = savedRolls.map((roll) => {
+    const option = document.createElement("option");
+    option.value = roll.name;
+    const expression = buildCheckExpression(roll.modifier, roll.accuracy, roll.difficulty);
+    option.textContent = `${toBoldUnicode(roll.name)}  ${toMonospaceUnicode(expression)}`;
+    return option;
+  });
+
+  els.savedRollsSelect.replaceChildren(placeholder, ...options);
+  els.savedRollsSelect.value = selectedName ?? "";
+}
+
+renderSavedRolls();
+
+els.saveRollBtn.addEventListener("click", () => {
+  const name = prompt("Name this roll:");
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (trimmed === "") return;
+
+  const roll = {
+    name: trimmed,
+    modifier: parseModifier(els.checkModifier.value),
+    accuracy: Math.max(0, Number(els.checkAccuracy.value) || 0),
+    difficulty: Math.max(0, Number(els.checkDifficulty.value) || 0),
+  };
+
+  const existingIndex = savedRolls.findIndex((r) => r.name === trimmed);
+  if (existingIndex === -1) {
+    savedRolls.push(roll);
+  } else {
+    savedRolls[existingIndex] = roll;
+  }
+  localStorage.setItem(SAVED_ROLLS_STORAGE_KEY, JSON.stringify(savedRolls));
+  renderSavedRolls(trimmed);
+});
+
+els.savedRollsSelect.addEventListener("change", () => {
+  const selected = savedRolls.find(
+    (r) => r.name === els.savedRollsSelect.value,
+  );
+  if (!selected) return;
+  els.checkModifier.value = formatModifier(selected.modifier);
+  els.checkAccuracy.value = String(selected.accuracy);
+  els.checkDifficulty.value = String(selected.difficulty);
+});
+
+els.deleteRollBtn.addEventListener("click", () => {
+  const name = els.savedRollsSelect.value;
+  if (!name) return;
+  savedRolls = savedRolls.filter((r) => r.name !== name);
+  localStorage.setItem(SAVED_ROLLS_STORAGE_KEY, JSON.stringify(savedRolls));
+  renderSavedRolls();
+});
 
 els.damageD6Minus.addEventListener("click", () => {
   els.damageD6.value = formatDiceCount(Math.max(0, parseDiceCount(els.damageD6.value) - 1), 6);
@@ -440,6 +555,7 @@ els.resetAllBtn.addEventListener("click", () => {
   els.damageFlat.value = "+0";
   setDamageKeepMode("");
   els.damageCrit.checked = false;
+  els.damageOverkill.checked = false;
   els.rollExpression.value = "";
   setStatus(els.globalStatus, "", false);
 });
@@ -461,7 +577,8 @@ els.damageRollBtn.addEventListener(
     const numD3 = parseDiceCount(els.damageD3.value);
     const flat = parseModifier(els.damageFlat.value);
     const crit = els.damageCrit.checked;
-    const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit);
+    const overkill = els.damageOverkill.checked;
+    const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit, overkill);
     await postJson(`/api/${pairingCode}/roll`, {
       expression,
       player_name: playerName,
