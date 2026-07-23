@@ -1,6 +1,6 @@
 # Lancer Companion
 
-A dice-rolling companion for the *Lancer* tabletop RPG: a Discord bot and a matching Owlbear Rodeo extension that share the exact same roll rules. The Owlbear extension works entirely on its own — rolling never requires Discord — and pairing it with the bot additionally posts every roll into a Discord channel.
+A dice-rolling companion for the *Lancer* tabletop RPG. Lancer Companion is two independent tools, sharing the exact same roll rules: a Discord bot, and an Owlbear Rodeo extension. Each works completely on its own — pair them together and every roll made in one also appears in the other.
 
 **Add the bot to Discord:** [Add to Discord](https://discord.com/oauth2/authorize?client_id=1528810293663371464&scope=bot&permissions=330752) — then run `l!h` in any channel for the command list, or `l!link` to pair the Owlbear extension.
 
@@ -55,7 +55,7 @@ A small in-memory, per-guild log of recent rolls made directly in Discord via `l
 
 ## The Owlbear extension
 
-A static site (`docs/`) — plain HTML/CSS/JS, no build step. Rolling works entirely standalone; a Discord pairing is optional.
+A static site (`docs/`) — plain HTML/CSS/JS, no build step.
 
 ### Rolling
 
@@ -63,15 +63,15 @@ A static site (`docs/`) — plain HTML/CSS/JS, no build step. Rolling works enti
 - **XdX damage** — d6/d3 counts, a Flat bonus, a Keep toggle (All/High/Low), Crit/Overkill checkboxes (Combat Drill is available too, opt in via Settings), a one-tap d2 button, saved rolls, and a Roll button.
 - **Advanced** — a free-form text box accepting the same expression syntax as `l!r`.
 
-All of this rolls **locally in the browser** (`docs/diceLogic.js`, a JS port of `lancer_logic.py`'s rules) — no server round trip, and no Discord bot needs to be reachable at all.
+All of this rolls locally in the browser, via `docs/diceLogic.js` — a JS port of `lancer_logic.py`'s rules.
 
 ### Roll History, shared live with the room
 
-Every roll — from any player's copy of the extension, in the same Owlbear room — is broadcast live to everyone else in that room via Owlbear's own broadcast channel (`OBR.broadcast`), with no server involved. This works identically whether or not the room is paired with Discord.
+Every roll — from any player's copy of the extension, in the same Owlbear room — is broadcast live to everyone else in that room via Owlbear's own broadcast channel (`OBR.broadcast`).
 
-### Pairing with Discord (optional)
+### Pairing with Discord
 
-If you *do* want rolls to also post into a Discord channel:
+To also post rolls into a Discord channel:
 
 1. Run `l!link` in the target channel; the bot replies with a short pairing code.
 2. Paste that code into the extension's Settings and save. Owlbear automatically syncs it to everyone in the room via room metadata, so only one person ever needs to enter it.
