@@ -1,15 +1,16 @@
-"""aiohttp web layer that lets the Owlbear extension trigger the same
-Lancer roll logic used by the Discord bot (via lancer_logic.py), and post
-the results into whichever Discord channel a pairing code is linked to.
+"""aiohttp web layer that lets the Owlbear extension post its own dice
+rolls into whichever Discord channel a pairing code is linked to.
+
+The extension rolls locally now (see docs/diceLogic.js, a JS port of
+lancer_logic.py's rolling rules) so it works without any Discord pairing
+at all; this server's only remaining job for a roll is /announce --
+formatting and posting an *already-computed* result to Discord when a
+room happens to be linked, reusing lancer_logic.py's own (unmodified)
+Discord formatters on the structured result the client sends over.
 
 Runs in the same asyncio event loop as the bot (see lancer_bot.main()), so
 handlers can call channel.send(...) directly using the bot's existing
 Discord connection -- no separate webhook or bot token needed.
-
-Structurally this mirrors the Ascension project's web_api.py, but with a
-single /roll endpoint (matching the bot's one flexible !r command) instead
-of separate d20/Challenge Dice/Momentum/Threat endpoints -- Lancer has no
-per-guild pool state, just the roll itself.
 """
 
 import logging
@@ -65,7 +66,15 @@ def create_app(bot, pairing_codes):
             "seq": event_bus.latest_seq(guild_id),
         })
 
-    async def handle_roll(request):
+    async def handle_announce(request):
+        """Called by the Owlbear extension after it's already rolled
+        locally (see docs/diceLogic.js) -- posts that already-computed
+        result to the linked Discord channel. Does NOT publish to
+        event_bus: Owlbear-to-Owlbear distribution is OBR.broadcast's job
+        now (see docs/app.js), not this server's. event_bus stays
+        exclusively for rolls made directly in Discord via l!r, which
+        reach Owlbear through the /updates polling below -- broadcast has
+        no way to reach *from* Discord, only between Owlbear clients."""
         pairing = resolve_pairing(request)
         if pairing is None:
             return web.json_response({"error": "Unknown or expired pairing code."}, status=404)
@@ -74,16 +83,10 @@ def create_app(bot, pairing_codes):
         if data is None:
             return web.json_response({"error": "Invalid JSON body."}, status=400)
 
-        expression = data.get("expression")
-        if not expression or not isinstance(expression, str):
-            return web.json_response({"error": "expression is required."}, status=400)
+        result = data.get("result")
+        if not isinstance(result, dict) or result.get("mode") not in ("check", "damage"):
+            return web.json_response({"error": "result is required."}, status=400)
 
-        try:
-            result = ll.perform_roll(expression)
-        except ll.LancerError as e:
-            return web.json_response({"error": str(e)}, status=400)
-
-        safe_result = ll.result_to_json_safe(result)
         actor = data.get("player_name") or "Someone"
         text = ll.format_roll_discord_shouted(result)
 
@@ -99,16 +102,7 @@ def create_app(bot, pairing_codes):
         # bot speaking.
         await channel.send(f"{_attribution(actor)}\n{text}")
 
-        event_bus.publish(pairing["guild_id"], {
-            "type": "roll",
-            "source": "owlbear",
-            "actor": actor,
-            "expression": expression,
-            "text": text,
-            **safe_result,
-        })
-
-        return web.json_response(safe_result)
+        return web.json_response({"ok": True})
 
     @web.middleware
     async def cors_middleware(request, handler):
@@ -129,7 +123,7 @@ def create_app(bot, pairing_codes):
 
     app = web.Application(middlewares=[cors_middleware])
     app.router.add_get('/api/{code}/updates', handle_updates)
-    app.router.add_post('/api/{code}/roll', handle_roll)
+    app.router.add_post('/api/{code}/announce', handle_announce)
     app.router.add_route('OPTIONS', '/{tail:.*}', lambda request: web.Response())
     return app
 

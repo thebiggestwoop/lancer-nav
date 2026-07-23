@@ -1,4 +1,5 @@
 import OBR from "https://esm.sh/@owlbear-rodeo/sdk@3.1.0";
+import * as diceLogic from "./diceLogic.js";
 
 // The bot now lives at a stable address, so this is baked in rather than
 // something each player has to paste into Settings.
@@ -8,6 +9,11 @@ const BACKEND_URL = "https://lancer-bot.heruv.uk";
 // so only one player has to paste the pairing code -- Owlbear replicates
 // room metadata to every connected client automatically.
 const METADATA_KEY = "com.lancer-companion.owlbear-extension/pairing-code";
+// Every roll made in this extension (paired or not) is broadcast on this
+// channel so everyone else in the same Owlbear room sees it live, with no
+// server involved -- this is what makes Roll History "shared with the
+// scene" regardless of whether a Discord room is linked.
+const ROLL_CHANNEL = "com.lancer-companion.owlbear-extension/roll";
 const MAX_HISTORY_ENTRIES = 20;
 const POLL_INTERVAL_MS = 2500;
 
@@ -64,10 +70,11 @@ const els = {
   damageDeleteRollBtn: document.getElementById("damage-delete-roll-btn"),
 };
 
-// The structured Check/Damage forms don't talk to the backend directly --
-// they build the same expression string the Discord `l!r` command and the
-// Advanced text box produce, then send it through the one /roll endpoint.
-// That keeps the parsing/validation logic in exactly one place (lancer_logic.py).
+// The structured Check/Damage forms build the same expression string the
+// Discord `l!r` command and the Advanced text box produce, then hand it to
+// performLocalRoll() (see below) -- rolled by diceLogic.js, a JS port of
+// lancer_logic.py's rules, so the parsing/validation stays behaviorally
+// identical to the bot's own without needing the bot to be reachable.
 // The Modifier field always shows an explicit sign ("+0", "+3", "-2"), so it
 // has to be a plain text input -- a type="number" input silently rejects a
 // leading "+" as an invalid value.
@@ -148,7 +155,13 @@ function setStatus(el, message, isError) {
 function applyConfigToInputs() {
   els.pairingCode.value = pairingCode || "";
   const linked = Boolean(pairingCode);
-  setStatus(els.settingsStatus, linked ? "Linked." : "Not linked yet.", !linked);
+  // Rolling works standalone either way -- this just says whether rolls
+  // also get posted to Discord, so an unlinked room isn't an error state.
+  setStatus(
+    els.settingsStatus,
+    linked ? "Linked -- rolls also post to Discord." : "Not linked -- rolling locally only.",
+    false,
+  );
 }
 
 // Combat Drill is a specific weapon tag most players won't have -- its
@@ -207,9 +220,10 @@ els.showDiceIconsSetting.addEventListener("change", () => {
 
 loadShowDiceIconsSetting();
 
-// event.timestamp is Unix epoch seconds (set server-side by event_bus.py).
-// Rendering it here, client-side, means each viewer sees it in their own
-// local timezone -- the same approach Discord itself uses for messages.
+// event.timestamp is Unix epoch seconds -- stamped by event_bus.py for
+// rolls made in Discord, or by performLocalRoll() itself for rolls made
+// here. Rendering it here, client-side, means each viewer sees it in their
+// own local timezone -- the same approach Discord itself uses for messages.
 function formatRollTime(epochSeconds) {
   return new Date(epochSeconds * 1000).toLocaleTimeString([], {
     hour: "2-digit",
@@ -431,18 +445,63 @@ function postJson(path, body) {
   });
 }
 
+// fn() can optionally return a non-blocking warning string (e.g. "rolled
+// fine, but couldn't reach Discord") instead of throwing -- shown the same
+// way an error would be, but without having stopped anything the roll
+// already did. Returning nothing/undefined clears the status as before.
 function withBusy(button, fn) {
   return async () => {
     button.disabled = true;
     try {
-      await fn();
-      setStatus(els.globalStatus, "", false);
+      const warning = await fn();
+      setStatus(els.globalStatus, warning || "", Boolean(warning));
     } catch (err) {
       setStatus(els.globalStatus, err.message, true);
     } finally {
       button.disabled = false;
     }
   };
+}
+
+// The one place every roll (d20 check, damage, d2, or a hand-typed
+// expression) actually goes through: rolls locally via diceLogic.js (no
+// server needed), shows the result immediately, broadcasts it to the rest
+// of the room so it's shared regardless of Discord pairing, and -- only if
+// paired -- separately asks the bot to also post it to the linked Discord
+// channel. A failed announce doesn't touch the roll that already
+// happened; it's surfaced as a soft warning (see withBusy) instead.
+async function performLocalRoll(expression) {
+  const result = diceLogic.performRoll(expression);
+  const text = diceLogic.formatRollDiscordShouted(result);
+  const safeResult = diceLogic.toJsonSafe(result);
+  const event = {
+    type: "roll",
+    source: "owlbear",
+    actor: playerName,
+    expression,
+    text,
+    timestamp: Math.floor(Date.now() / 1000),
+    ...safeResult,
+  };
+
+  addHistoryEntry(event);
+  OBR.broadcast.sendMessage(ROLL_CHANNEL, event, { destination: "REMOTE" }).catch(() => {
+    // Non-fatal -- other clients just won't see this particular roll live.
+  });
+
+  if (!pairingCode) {
+    return undefined;
+  }
+  try {
+    await postJson(`/api/${pairingCode}/announce`, {
+      result: safeResult,
+      expression,
+      player_name: playerName,
+    });
+    return undefined;
+  } catch (err) {
+    return `Rolled, but couldn't post to Discord: ${err.message}`;
+  }
 }
 
 els.saveSettings.addEventListener("click", withBusy(els.saveSettings, savePairingCode));
@@ -454,10 +513,7 @@ els.rollBtn.addEventListener(
     if (!expression) {
       throw new Error("Enter a roll expression first.");
     }
-    await postJson(`/api/${pairingCode}/roll`, {
-      expression,
-      player_name: playerName,
-    });
+    return performLocalRoll(expression);
   })
 );
 
@@ -496,15 +552,13 @@ els.checkRollBtn.addEventListener(
     const accuracy = Math.max(0, Number(els.checkAccuracy.value) || 0);
     const difficulty = Math.max(0, Number(els.checkDifficulty.value) || 0);
     const expression = buildCheckExpression(modifier, accuracy, difficulty);
-    await postJson(`/api/${pairingCode}/roll`, {
-      expression,
-      player_name: playerName,
-    });
+    const warning = await performLocalRoll(expression);
     // Clear the saved-roll selection once it's actually been rolled, so
     // picking the same saved roll again afterward fires a fresh "change"
     // event instead of silently no-oping (browsers only fire "change" when
     // the picked value differs from before).
     els.savedRollsSelect.value = "";
+    return warning;
   })
 );
 
@@ -676,12 +730,7 @@ els.resetAllBtn.addEventListener("click", () => {
 
 els.damageD2Btn.addEventListener(
   "click",
-  withBusy(els.damageD2Btn, async () => {
-    await postJson(`/api/${pairingCode}/roll`, {
-      expression: "1d2",
-      player_name: playerName,
-    });
-  })
+  withBusy(els.damageD2Btn, () => performLocalRoll("1d2"))
 );
 
 els.damageRollBtn.addEventListener(
@@ -694,14 +743,12 @@ els.damageRollBtn.addEventListener(
     const overkill = els.damageOverkill.checked;
     const combatDrill = els.damageCombatDrill.checked;
     const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit, overkill, combatDrill);
-    await postJson(`/api/${pairingCode}/roll`, {
-      expression,
-      player_name: playerName,
-    });
+    const warning = await performLocalRoll(expression);
     // Same reasoning as the d20 card's saved rolls: clear the selection only
     // once it's actually been rolled, so picking the same saved roll again
     // afterward fires a fresh "change" event.
     els.damageSavedRollsSelect.value = "";
+    return warning;
   })
 );
 
@@ -845,6 +892,12 @@ async function init() {
       startPolling();
     }
   });
+
+  // Unconditional -- works whether or not this room is paired with
+  // Discord, since it's peer-to-peer through Owlbear's own relay, not the
+  // bot's server. This (not polling) is what makes Roll History live and
+  // shared with everyone else in the scene.
+  OBR.broadcast.onMessage(ROLL_CHANNEL, (event) => addHistoryEntry(event.data));
 }
 
 if (OBR.isReady) {
