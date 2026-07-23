@@ -30,20 +30,38 @@ class LancerError(Exception):
 # Rolling
 # ---------------------------------------------------------------------------
 
-def _roll_die_with_overkill(sides):
+def _roll_die_with_overkill(sides, combat_drill=False):
     """Rolls one die, rerolling on a 1 (each 1 rolled -- including the ones
-    that trigger further rerolls -- costs 1 Heat). Returns (final_face,
-    discarded_ones) -- discarded_ones is the list of 1s rerolled away, in
-    the order they came up, so callers can display the full reroll chain."""
+    that trigger further rerolls -- costs 1 Heat).
+
+    combat_drill=True applies the Combat Drill tag: every individual 1
+    rolled (on this die, or on any bonus die Combat Drill spawns) also
+    spawns an extra +1d6 bonus damage die -- itself independently subject
+    to the same Overkill + Combat Drill rules, so it chains indefinitely
+    if a spawned bonus die is also a 1.
+
+    Returns (final_face, discarded_ones, heat, bonus_dice) --
+    discarded_ones is the list of 1s rerolled away for THIS die, in the
+    order they came up; bonus_dice is a flat list of (final_face,
+    discarded_ones, heat) for every Combat Drill bonus d6 spawned
+    (including nested ones), in trigger order."""
     discarded_ones = []
+    bonus_dice = []
+    heat = 0
     face = random.randint(1, sides)
     while face == 1:
         discarded_ones.append(face)
+        heat += 1
+        if combat_drill:
+            bonus_face, bonus_discarded, bonus_heat, nested_bonus = _roll_die_with_overkill(6, combat_drill=True)
+            bonus_dice.append((bonus_face, bonus_discarded, bonus_heat))
+            bonus_dice.extend(nested_bonus)
+            heat += bonus_heat
         face = random.randint(1, sides)
-    return face, discarded_ones
+    return face, discarded_ones, heat, bonus_dice
 
 
-def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=False):
+def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=False, combat_drill=False):
     """Rolls `count` dice of `sides`, optionally keeping only the highest
     ("h") or lowest ("l") `keep_count` of them (keep_mode=None keeps all,
     i.e. a normal sum). Accuracy/Difficulty's "roll N d6, keep the highest"
@@ -52,20 +70,30 @@ def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=Fals
 
     overkill=True applies the Overkill weapon tag: any die that lands on a
     1 costs 1 Heat and is rerolled (additional 1s keep triggering it).
+    combat_drill=True implies overkill, and additionally spawns +1d6 bonus
+    damage each time Overkill triggers (see _roll_die_with_overkill) --
+    those bonus dice always count toward the total in full, never subject
+    to the keep-highest/lowest filter (they aren't part of the `count`-sized
+    pool being filtered).
 
-    Returns (rolls, kept_indices, total, heat, discarded) -- kept_indices is
-    a set of indices into `rolls` so callers can show which dice were
-    dropped; discarded is a list parallel to `rolls`, each entry the (empty,
-    unless overkill) list of 1s rerolled away for that die."""
+    Returns (rolls, kept_indices, total, heat, discarded, bonus_dice) --
+    kept_indices is a set of indices into `rolls` so callers can show which
+    dice were dropped; discarded is a list parallel to `rolls`, each entry
+    the (empty, unless overkill) list of 1s rerolled away for that die;
+    bonus_dice is every Combat Drill bonus d6 spawned across all `count`
+    dice (see _roll_die_with_overkill)."""
+    overkill = overkill or combat_drill
+    bonus_dice = []
     if overkill:
         rolls = []
         discarded = []
         heat = 0
         for _ in range(count):
-            face, discarded_ones = _roll_die_with_overkill(sides)
+            face, discarded_ones, die_heat, die_bonus = _roll_die_with_overkill(sides, combat_drill)
             rolls.append(face)
             discarded.append(discarded_ones)
-            heat += len(discarded_ones)
+            heat += die_heat
+            bonus_dice.extend(die_bonus)
     else:
         rolls = [random.randint(1, sides) for _ in range(count)]
         discarded = [[] for _ in rolls]
@@ -75,8 +103,8 @@ def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=Fals
     else:
         order = sorted(range(len(rolls)), key=lambda i: rolls[i], reverse=(keep_mode == "h"))
         kept_indices = set(order[:keep_count])
-    total = sum(rolls[i] for i in kept_indices)
-    return rolls, kept_indices, total, heat, discarded
+    total = sum(rolls[i] for i in kept_indices) + sum(face for face, _, _ in bonus_dice)
+    return rolls, kept_indices, total, heat, discarded, bonus_dice
 
 
 def roll_d20_check(modifier, accuracy=0, difficulty=0):
@@ -99,7 +127,7 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
     kept_indices = set()
     bonus = 0
     if net != 0:
-        bonus_dice, kept_indices, kept_sum, _, _ = _roll_kept_dice(abs(net), 6, "h", 1)
+        bonus_dice, kept_indices, kept_sum, _, _, _ = _roll_kept_dice(abs(net), 6, "h", 1)
         bonus = kept_sum if net > 0 else -kept_sum
 
     total = d20_roll + modifier + bonus
@@ -117,15 +145,15 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
     }
 
 
-def _roll_damage_once(dice_terms, flat, overkill=False):
-    rolls_by_term = []  # (sides, rolls, kept_indices, discarded) per term, in order
+def _roll_damage_once(dice_terms, flat, overkill=False, combat_drill=False):
+    rolls_by_term = []  # (sides, rolls, kept_indices, discarded, bonus_dice) per term, in order
     total = flat
     heat = 0
     for count, sides, keep_mode, keep_count in dice_terms:
-        rolls, kept_indices, kept_sum, die_heat, discarded = _roll_kept_dice(
-            count, sides, keep_mode, keep_count, overkill
+        rolls, kept_indices, kept_sum, die_heat, discarded, bonus_dice = _roll_kept_dice(
+            count, sides, keep_mode, keep_count, overkill, combat_drill
         )
-        rolls_by_term.append((sides, rolls, kept_indices, discarded))
+        rolls_by_term.append((sides, rolls, kept_indices, discarded, bonus_dice))
         total += kept_sum
         heat += die_heat
     return {"rolls_by_term": rolls_by_term, "flat": flat, "total": total, "heat": heat}
@@ -145,7 +173,7 @@ def _crit_term(term):
     return (count * 2, sides, keep_mode, keep_count)
 
 
-def roll_damage(dice_terms, flat=0, crit=False, overkill=False):
+def roll_damage(dice_terms, flat=0, crit=False, overkill=False, combat_drill=False):
     """dice_terms is a list of (count, sides, keep_mode, keep_count) tuples
     -- keep_mode/keep_count are None for a plain sum-all-the-dice term, or
     ("h"|"l", n) style values for a hand-typed "khN"/"klN" term. E.g.
@@ -159,7 +187,12 @@ def roll_damage(dice_terms, flat=0, crit=False, overkill=False):
     If overkill is True, applies the Overkill weapon tag to every damage
     die actually rolled (including the doubled crit pool, and any of its
     dropped dice): each 1 rolled costs 1 Heat and is rerolled, with further
-    1s continuing to trigger it."""
+    1s continuing to trigger it.
+
+    If combat_drill is True, the weapon automatically counts as having
+    Overkill, and additionally deals an extra +1d6 bonus damage each time
+    Overkill activates -- chaining indefinitely if that bonus die is also
+    a 1 (see _roll_die_with_overkill)."""
     for count, sides, keep_mode, keep_count in dice_terms:
         if count < 0:
             raise LancerError("Number of dice must be zero or positive.")
@@ -175,11 +208,12 @@ def roll_damage(dice_terms, flat=0, crit=False, overkill=False):
         if count > MAX_DAMAGE_DICE:
             raise LancerError(f"Number of dice must be at most {MAX_DAMAGE_DICE}, even doubled for a crit.")
 
-    attempt = _roll_damage_once(effective_terms, flat, overkill)
+    attempt = _roll_damage_once(effective_terms, flat, overkill, combat_drill)
     return {
         "mode": "damage",
         "crit": crit,
-        "overkill": overkill,
+        "overkill": overkill or combat_drill,
+        "combat_drill": combat_drill,
         "attempts": [attempt],
         "total": attempt["total"],
         "heat": attempt["heat"],
@@ -199,8 +233,10 @@ _ACCURACY_TOKEN_RE = re.compile(r"^a(\d*)$", re.IGNORECASE)
 def parse_roll_expression(expr):
     """Parses a roll expression like "d20 + 3 a2" (check: +3 modifier, 2
     Accuracy), "2d6 + 3 crit" (damage: 2d6+3, crit), "4d6kh2 + 3"
-    (damage: roll 4d6, keep the highest 2, +3), or "2d6 overkill" (damage:
-    2d6, Overkill weapon tag).
+    (damage: roll 4d6, keep the highest 2, +3), "2d6 overkill" (damage:
+    2d6, Overkill weapon tag), or "2d6 combatdrill" (damage: 2d6, Combat
+    Drill -- implies Overkill, plus a chaining +1d6 bonus each time it
+    activates).
 
     Whether "d20" appears anywhere determines the mode. In damage
     expressions, dice are always written with an explicit die type that's
@@ -217,6 +253,7 @@ def parse_roll_expression(expr):
     flat_total = 0
     crit = False
     overkill = False
+    combat_drill = False
     unrecognized = []
 
     for sign, word in tokens:
@@ -250,6 +287,10 @@ def parse_roll_expression(expr):
             overkill = True
             continue
 
+        if word.lower() == "combatdrill":
+            combat_drill = True
+            continue
+
         if word.isdigit():
             flat_total += signed * int(word)
             continue
@@ -278,6 +319,7 @@ def parse_roll_expression(expr):
         "flat": flat_total,
         "crit": crit,
         "overkill": overkill,
+        "combat_drill": combat_drill,
     }
 
 
@@ -288,7 +330,9 @@ def perform_roll(expr):
     parsed = parse_roll_expression(expr)
     if parsed["mode"] == "check":
         return roll_d20_check(parsed["modifier"], parsed["accuracy"], parsed["difficulty"])
-    return roll_damage(parsed["dice_terms"], parsed["flat"], parsed["crit"], parsed["overkill"])
+    return roll_damage(
+        parsed["dice_terms"], parsed["flat"], parsed["crit"], parsed["overkill"], parsed["combat_drill"]
+    )
 
 
 def result_to_json_safe(result):
@@ -399,24 +443,23 @@ def _chunk_emoji_string(emoji_string):
 
 def roll_emoji_chunks(result):
     """All the dice from one roll -- the d20 AND any Accuracy/Difficulty
-    bonus d6s for a check, or every term's dice for a damage roll (crit or
-    not -- a crit just means each term's dice pool was doubled) -- as a
-    single emoji string, split into Discord-message-sized chunks. Everything
-    from one command lands in the same message rather than one message per
-    die type."""
+    bonus d6s for a check, or every term's dice (plus any Combat Drill
+    bonus d6s spawned) for a damage roll (crit or not -- a crit just means
+    each term's dice pool was doubled) -- as a single emoji string, split
+    into Discord-message-sized chunks. Everything from one command lands
+    in the same message rather than one message per die type."""
     if result["mode"] == "check":
         emojis = [d20_emojis[result["d20"]]]
         emojis.extend(d6_emojis[roll] for roll in result["bonus_dice"])
         emoji_string = "".join(emojis)
     else:
-        attempt_rows = [
-            "".join(
-                _die_emoji(sides, roll)
-                for sides, rolls, _, _ in attempt["rolls_by_term"]
-                for roll in rolls
-            )
-            for attempt in result["attempts"]
-        ]
+        attempt_rows = []
+        for attempt in result["attempts"]:
+            faces = []
+            for sides, rolls, _, _, bonus_dice in attempt["rolls_by_term"]:
+                faces.extend((sides, roll) for roll in rolls)
+                faces.extend((6, bonus_face) for bonus_face, _, _ in bonus_dice)
+            attempt_rows.append("".join(_die_emoji(s, f) for s, f in faces))
         emoji_string = "\n".join(attempt_rows)
     return _chunk_emoji_string(emoji_string)
 
@@ -462,9 +505,15 @@ def format_check_discord(result):
 
 def _describe_damage_attempt(attempt):
     dice_pieces = []
-    for sides, rolls, kept_indices, discarded in attempt["rolls_by_term"]:
+    for sides, rolls, kept_indices, discarded, bonus_dice in attempt["rolls_by_term"]:
         rolls_str = _format_dice_with_kept(rolls, kept_indices, discarded)
         dice_pieces.append(f"{len(rolls)}d{sides} ({rolls_str})")
+        # Combat Drill bonus dice always count in full -- shown as their own
+        # "1d6 (bonus, ...)" piece each, with their own reroll chain if the
+        # bonus die itself triggered further Overkill/Combat Drill rerolls.
+        for bonus_face, bonus_discarded, _ in bonus_dice:
+            bonus_str = _format_dice_with_kept([bonus_face], {0}, [bonus_discarded])
+            dice_pieces.append(f"1d6 (bonus, {bonus_str})")
 
     equation = " + ".join(dice_pieces)
     if attempt["flat"]:
@@ -481,6 +530,11 @@ def format_damage_discord(result):
     lines = [f"**Result:** {equation}", f"**Total:** {result['total']}"]
     if result.get("overkill"):
         lines.append(f"**Overkill:** {result['heat']} Heat")
+    if result.get("combat_drill"):
+        bonus_count = sum(
+            len(bonus_dice) for _, _, _, _, bonus_dice in result["attempts"][0]["rolls_by_term"]
+        )
+        lines.append(f"**Combat Drill:** {bonus_count} bonus 1d6")
     return "\n".join(lines)
 
 
