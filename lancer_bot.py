@@ -54,7 +54,7 @@ async def roll(ctx, *, expression: str):
 
     text = ll.format_roll_discord(result)
     title = result.get("title")
-    header = f"{ctx.author.mention} **: {title}**" if title else ctx.author.mention
+    header = f"{ctx.author.mention}**: {title}**" if title else ctx.author.mention
     await ctx.send(f"{header}\n{text}")
 
     event_bus.publish(ctx.guild.id, {

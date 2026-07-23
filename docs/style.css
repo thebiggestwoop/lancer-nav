@@ -483,6 +483,12 @@ input:disabled {
   margin-top: 2px;
 }
 
+.roll-title-line {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
 .roll-total-line {
   display: block;
   width: fit-content;

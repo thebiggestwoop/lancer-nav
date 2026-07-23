@@ -393,27 +393,30 @@ function addHistoryEntry(event) {
   line1.appendChild(actorEl);
   const sourceTag = event.source === "discord" ? "Discord" : "Owlbear";
   line1.appendChild(document.createTextNode(` (${sourceTag})`));
-  if (event.title) {
-    line1.appendChild(document.createTextNode(" "));
-    const titleEl = document.createElement("strong");
-    titleEl.textContent = `: ${event.title}`;
-    line1.appendChild(titleEl);
-  }
   if (typeof event.timestamp === "number") {
     const timeEl = document.createElement("span");
     timeEl.className = "roll-time";
     timeEl.textContent = ` ${formatRollTime(event.timestamp)}`;
     line1.appendChild(timeEl);
   }
+  li.appendChild(line1);
+
+  // Its own row, above the dice icons -- same size as the Total row (see
+  // .roll-title-line/.roll-total-line in style.css).
+  if (event.title) {
+    const titleEl = document.createElement("div");
+    titleEl.className = "roll-title-line";
+    titleEl.textContent = event.title;
+    li.appendChild(titleEl);
+  }
+
+  rollDiceFaceRows(event)
+    .filter((row) => row.length > 0)
+    .forEach((row) => li.appendChild(buildDiceFacesRow(row)));
 
   const line2 = document.createElement("div");
   line2.className = "roll-text";
   appendLiteMarkdown(line2, event.text);
-
-  li.appendChild(line1);
-  rollDiceFaceRows(event)
-    .filter((row) => row.length > 0)
-    .forEach((row) => li.appendChild(buildDiceFacesRow(row)));
   li.appendChild(line2);
 
   els.rollHistory.appendChild(li);

@@ -102,7 +102,7 @@ def create_app(bot, pairing_codes):
         # The title (if any) rides on the same header line, separated by
         # ": " rather than its own line.
         title = result.get("title")
-        header = f"{_attribution(actor)} **: {title}**" if title else _attribution(actor)
+        header = f"{_attribution(actor)}**: {title}**" if title else _attribution(actor)
         await channel.send(f"{header}\n{text}")
 
         return web.json_response({"ok": True})
