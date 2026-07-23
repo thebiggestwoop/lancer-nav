@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Privacy Policy — Lancer Companion</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --fg: #1e1f22;
+    --muted: #5b5f66;
+    --border: #d4d6da;
+    --accent: #802932;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1e1f22;
+      --fg: #f2f3f5;
+      --muted: #a6a9ae;
+      --border: #3a3c40;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 32px 20px 80px;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6;
+  }
+  main {
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 26px;
+    margin: 0 0 4px 0;
+  }
+  .updated {
+    color: var(--muted);
+    font-size: 13px;
+    margin: 0 0 32px 0;
+  }
+  h2 {
+    font-size: 18px;
+    margin: 32px 0 8px 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  p, li {
+    font-size: 15px;
+  }
+  ul {
+    padding-left: 22px;
+  }
+  a {
+    color: var(--accent);
+  }
+  .nav {
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+  code {
+    font-family: Consolas, monospace;
+    font-size: 0.9em;
+    background: rgba(128, 128, 128, 0.15);
+    padding: 1px 4px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="nav"><a href="https://github.com/thebiggestwoop/lancer-companion">Lancer Companion</a> · <a href="terms.html">Terms of Service</a></div>
+
+  <h1>Privacy Policy</h1>
+  <p class="updated">Last updated: July 24, 2026</p>
+
+  <p>This policy covers the Lancer Companion Discord bot and its companion Owlbear Rodeo extension (together, "Lancer Companion," "we," or "the service"). It's an unofficial, free, hobby-run dice-rolling utility for the <em>Lancer</em> tabletop RPG.</p>
+
+  <h2>Information we collect</h2>
+  <p><strong>Through the Discord bot:</strong></p>
+  <ul>
+    <li>Message content, but only for messages that start with the bot's command prefix (<code>l!</code>) — used solely to parse and execute that command.</li>
+    <li>Your Discord user ID, username/display name, and server/channel IDs — used to reply to you, attribute a roll to you in the shared activity log, and route pairing codes to the right channel.</li>
+  </ul>
+  <p><strong>Through the Owlbear extension:</strong></p>
+  <ul>
+    <li>Your Owlbear player display name — used to label rolls in Roll History.</li>
+    <li>The dice expressions and results you roll.</li>
+    <li>A pairing code, only if you choose to link a room to a Discord channel.</li>
+  </ul>
+  <p>We don't require or collect an account, email address, or any payment information — there's nothing to sign up for.</p>
+
+  <h2>How we use it</h2>
+  <p>Solely to operate the features described in the project's <a href="https://github.com/thebiggestwoop/lancer-companion">README</a>: rolling dice, replying in Discord, and sharing/posting roll results between Owlbear and a linked Discord channel. We don't use your data for advertising, profiling, or anything unrelated to running the bot and extension.</p>
+
+  <h2>Storage and retention</h2>
+  <p>There is no database. Everything the bot process holds — pairing codes and the per-guild roll activity log (capped at a small number of recent entries) — lives only in server memory and is lost whenever the bot restarts; it is never written to disk or backed up.</p>
+  <p>Data the extension keeps (saved rolls, your settings, a linked pairing code) lives entirely in your own browser's local storage or in Owlbear's own room metadata sync — it never passes through our server except at the moment a roll needs to be posted to a linked Discord channel.</p>
+
+  <h2>Third parties</h2>
+  <p>We don't sell, rent, or share your data with anyone. The only other parties involved are the platforms this project runs on top of — Discord and Owlbear Rodeo — each governed by their own privacy policies for the data their platforms process.</p>
+
+  <h2>Children's privacy</h2>
+  <p>This service is not directed at children. Using Discord at all requires meeting Discord's own minimum age requirement under its Terms of Service.</p>
+
+  <h2>Your choices</h2>
+  <p>Remove the bot from your server, or simply stop using the extension, to stop any further processing. Clearing your browser's local storage removes all client-side data the extension has kept. Leaving a Discord room unpaired (or turning off "Pair with Discord" in Settings) keeps your rolls entirely local to your own browser.</p>
+
+  <h2>Changes to this policy</h2>
+  <p>This policy may be updated occasionally as the project changes. Continuing to use the bot or extension after a change constitutes acceptance of the update.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about this policy can be raised by opening an issue on the <a href="https://github.com/thebiggestwoop/lancer-companion">GitHub repository</a>.</p>
+</main>
+</body>
+</html>
