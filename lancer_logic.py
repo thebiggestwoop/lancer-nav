@@ -32,13 +32,15 @@ class LancerError(Exception):
 
 def _roll_die_with_overkill(sides):
     """Rolls one die, rerolling on a 1 (each 1 rolled -- including the ones
-    that trigger further rerolls -- costs 1 Heat). Returns (final_face, heat)."""
-    heat = 0
+    that trigger further rerolls -- costs 1 Heat). Returns (final_face,
+    discarded_ones) -- discarded_ones is the list of 1s rerolled away, in
+    the order they came up, so callers can display the full reroll chain."""
+    discarded_ones = []
     face = random.randint(1, sides)
     while face == 1:
-        heat += 1
+        discarded_ones.append(face)
         face = random.randint(1, sides)
-    return face, heat
+    return face, discarded_ones
 
 
 def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=False):
@@ -51,18 +53,22 @@ def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=Fals
     overkill=True applies the Overkill weapon tag: any die that lands on a
     1 costs 1 Heat and is rerolled (additional 1s keep triggering it).
 
-    Returns (rolls, kept_indices, total, heat) -- kept_indices is a set of
-    indices into `rolls` so callers can show which dice were dropped.
-    """
+    Returns (rolls, kept_indices, total, heat, discarded) -- kept_indices is
+    a set of indices into `rolls` so callers can show which dice were
+    dropped; discarded is a list parallel to `rolls`, each entry the (empty,
+    unless overkill) list of 1s rerolled away for that die."""
     if overkill:
         rolls = []
+        discarded = []
         heat = 0
         for _ in range(count):
-            face, die_heat = _roll_die_with_overkill(sides)
+            face, discarded_ones = _roll_die_with_overkill(sides)
             rolls.append(face)
-            heat += die_heat
+            discarded.append(discarded_ones)
+            heat += len(discarded_ones)
     else:
         rolls = [random.randint(1, sides) for _ in range(count)]
+        discarded = [[] for _ in rolls]
         heat = 0
     if keep_mode is None:
         kept_indices = set(range(len(rolls)))
@@ -70,7 +76,7 @@ def _roll_kept_dice(count, sides, keep_mode=None, keep_count=None, overkill=Fals
         order = sorted(range(len(rolls)), key=lambda i: rolls[i], reverse=(keep_mode == "h"))
         kept_indices = set(order[:keep_count])
     total = sum(rolls[i] for i in kept_indices)
-    return rolls, kept_indices, total, heat
+    return rolls, kept_indices, total, heat, discarded
 
 
 def roll_d20_check(modifier, accuracy=0, difficulty=0):
@@ -93,7 +99,7 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
     kept_indices = set()
     bonus = 0
     if net != 0:
-        bonus_dice, kept_indices, kept_sum, _ = _roll_kept_dice(abs(net), 6, "h", 1)
+        bonus_dice, kept_indices, kept_sum, _, _ = _roll_kept_dice(abs(net), 6, "h", 1)
         bonus = kept_sum if net > 0 else -kept_sum
 
     total = d20_roll + modifier + bonus
@@ -112,14 +118,14 @@ def roll_d20_check(modifier, accuracy=0, difficulty=0):
 
 
 def _roll_damage_once(dice_terms, flat, overkill=False):
-    rolls_by_term = []  # (sides, rolls, kept_indices) per term, in order
+    rolls_by_term = []  # (sides, rolls, kept_indices, discarded) per term, in order
     total = flat
     heat = 0
     for count, sides, keep_mode, keep_count in dice_terms:
-        rolls, kept_indices, kept_sum, die_heat = _roll_kept_dice(
+        rolls, kept_indices, kept_sum, die_heat, discarded = _roll_kept_dice(
             count, sides, keep_mode, keep_count, overkill
         )
-        rolls_by_term.append((sides, rolls, kept_indices))
+        rolls_by_term.append((sides, rolls, kept_indices, discarded))
         total += kept_sum
         heat += die_heat
     return {"rolls_by_term": rolls_by_term, "flat": flat, "total": total, "heat": heat}
@@ -406,7 +412,7 @@ def roll_emoji_chunks(result):
         attempt_rows = [
             "".join(
                 _die_emoji(sides, roll)
-                for sides, rolls, _ in attempt["rolls_by_term"]
+                for sides, rolls, _, _ in attempt["rolls_by_term"]
                 for roll in rolls
             )
             for attempt in result["attempts"]
@@ -419,10 +425,18 @@ def _signed(value):
     return f"+ {value}" if value >= 0 else f"- {abs(value)}"
 
 
-def _format_dice_with_kept(rolls, kept_indices):
+def _format_dice_with_kept(rolls, kept_indices, discarded=None):
     """Shows all the rolled dice, striking through the ones that weren't
-    kept (dropped by a keep-highest/keep-lowest rule)."""
-    return ", ".join(str(r) if i in kept_indices else f"~~{r}~~" for i, r in enumerate(rolls))
+    kept (dropped by a keep-highest/keep-lowest rule). If `discarded` is
+    given (one list of rerolled-away 1s per die, from Overkill), each die's
+    reroll chain is shown too, every rerolled 1 struck through, ahead of
+    its final result."""
+    pieces = []
+    for i, r in enumerate(rolls):
+        for one in (discarded[i] if discarded else []):
+            pieces.append(f"~~{one}~~")
+        pieces.append(str(r) if i in kept_indices else f"~~{r}~~")
+    return ", ".join(pieces)
 
 
 def format_check_discord(result):
@@ -448,8 +462,8 @@ def format_check_discord(result):
 
 def _describe_damage_attempt(attempt):
     dice_pieces = []
-    for sides, rolls, kept_indices in attempt["rolls_by_term"]:
-        rolls_str = _format_dice_with_kept(rolls, kept_indices)
+    for sides, rolls, kept_indices, discarded in attempt["rolls_by_term"]:
+        rolls_str = _format_dice_with_kept(rolls, kept_indices, discarded)
         dice_pieces.append(f"{len(rolls)}d{sides} ({rolls_str})")
 
     equation = " + ".join(dice_pieces)
@@ -460,12 +474,11 @@ def _describe_damage_attempt(attempt):
 
 
 def format_damage_discord(result):
+    # "CRIT" is reserved for the d20 attack roll that actually triggers one
+    # (format_check_discord's is_crit) -- a damage roll's own "crit" flag
+    # just means its dice mechanic doubled, so it isn't re-announced here.
     equation = _describe_damage_attempt(result["attempts"][0])
-    total_line = f"**Total:** {result['total']}"
-    if result["crit"]:
-        total_line += " -- CRIT!"
-
-    lines = [f"**Result:** {equation}", total_line]
+    lines = [f"**Result:** {equation}", f"**Total:** {result['total']}"]
     if result.get("overkill"):
         lines.append(f"**Overkill:** {result['heat']} Heat")
     return "\n".join(lines)
