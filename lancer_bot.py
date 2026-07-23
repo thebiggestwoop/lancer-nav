@@ -88,7 +88,9 @@ async def help_command(ctx):
         "- `overkill` -- e.g. `l!r 2d6 overkill` -- any die that lands on a 1 costs 1 Heat and is rerolled (further 1s keep triggering it); the total Heat taken is reported.\n"
         "- `combatdrill` -- e.g. `l!r 2d6 combatdrill` -- implies `overkill`, and also deals an extra +1d6 bonus damage each time Overkill activates (chains further if that bonus die is also a 1).\n"
         "- Any other trailing word(s) become a title for the roll (up to 30 characters) -- e.g. `l!r d20 + 3 Rifle` is titled \"Rifle\".\n"
-        "**l!link** - Generates a code to link this channel to the Owlbear extension.\n"
+        "**l!link** - Generates a code to link this channel to the Owlbear extension.\n\n"
+        "**Owlbear extension:** `https://lancer-owlbear.heruv.uk/manifest.json`\n"
+        "**GitHub:** <https://github.com/thebiggestwoop/lancer-nav>\n"
     )
     await ctx.send(help_text)
 
