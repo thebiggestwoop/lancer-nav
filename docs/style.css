@@ -336,18 +336,9 @@ select {
   color: var(--accent-text);
 }
 
-.d2-row {
-  align-items: stretch;
-}
-
 .quick-die-btn {
   flex: 0 0 auto;
   width: 48px;
-}
-
-.d2-row .btn-primary {
-  flex: 1;
-  width: auto;
 }
 
 .saved-roll-row {
@@ -414,11 +405,19 @@ button:disabled {
   cursor: default;
 }
 
+.confirm-danger-btn,
+.confirm-danger-btn:hover {
+  border-color: var(--accent);
+}
+
 .roll-history {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 240px;
+  /* Fixed (not max-) height -- keeps the card at a constant size regardless
+     of entry count, so the rest of the layout never shifts and leaves
+     blank space at the bottom of the extension when history is short. */
+  height: 240px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -454,8 +453,23 @@ button:disabled {
 }
 
 .roll-total-line {
+  display: block;
+  width: fit-content;
   font-size: 16px;
   text-transform: uppercase;
+  border: 1px solid var(--accent-2);
+  padding: 2px 4px;
+  margin-top: 2px;
+}
+
+.roll-overkill-line {
+  display: block;
+  width: fit-content;
+  font-size: 16px;
+  text-transform: uppercase;
+  border: 1px solid var(--accent);
+  padding: 2px 4px;
+  margin-top: 2px;
 }
 
 .roll-uppercase-line {

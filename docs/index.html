@@ -27,6 +27,10 @@
       <input id="show-dice-icons-setting" type="checkbox" checked />
       Show Dice Icons
     </label>
+    <div class="row">
+      <button id="clear-saved-rolls-btn" type="button">Clear all saved rolls</button>
+      <button id="confirm-clear-saved-rolls-btn" type="button" class="confirm-danger-btn hidden">Are you sure?</button>
+    </div>
   </details>
 
   <section class="card">
@@ -129,6 +133,7 @@
           <button id="damage-keep-low" class="keep-btn" type="button" data-keep="l">Low</button>
         </div>
       </div>
+      <button id="damage-d2-btn" class="quick-die-btn" type="button">d2</button>
       <div class="checkbox-group">
         <label class="checkbox-field">
           <input id="damage-crit" type="checkbox" />
@@ -150,8 +155,7 @@
       </select>
       <button id="damage-delete-roll-btn" type="button" class="delete-roll-btn" title="Delete selected saved roll" aria-label="Delete selected saved roll">&times;</button>
     </div>
-    <div class="row d2-row">
-      <button id="damage-d2-btn" class="quick-die-btn" type="button">d2</button>
+    <div class="row save-roll-row">
       <button id="damage-save-roll-btn" type="button" class="save-roll-btn">Save Roll</button>
       <button id="damage-roll-btn" class="btn-primary">Roll</button>
     </div>
@@ -166,7 +170,7 @@
       </div>
       <button id="roll-btn">Roll</button>
     </details>
-    <button id="reset-all-btn" class="reset-btn" type="button">Reset All</button>
+    <button id="reset-all-btn" class="reset-btn" type="button">Clear</button>
   </div>
 
   <script type="module" src="app.js"></script>

@@ -19,6 +19,8 @@ const els = {
   resetAllBtn: document.getElementById("reset-all-btn"),
   showCombatDrillSetting: document.getElementById("show-combat-drill-setting"),
   showDiceIconsSetting: document.getElementById("show-dice-icons-setting"),
+  clearSavedRollsBtn: document.getElementById("clear-saved-rolls-btn"),
+  confirmClearSavedRollsBtn: document.getElementById("confirm-clear-saved-rolls-btn"),
 
   rollHistory: document.getElementById("roll-history"),
 
@@ -268,25 +270,36 @@ function buildDiceFacesRow(faces) {
 // uses **bold** and ~~strikethrough~~. Rendered by building real DOM nodes
 // (never innerHTML) so nothing in the text can be parsed as HTML.
 // Lines from lancer_logic.py's format_*_discord() always start with one of
-// these bolded labels -- Total gets a larger font size (the bot already
-// sends everything in all caps itself, matching the Discord messages, so
-// no text-transform is needed here). Case-insensitive since the source
-// text is already all caps by the time it gets here.
+// these bolded labels -- Total and Overkill get their own banner-style
+// treatment (larger, colored background); Combat Drill just keeps the
+// plain uppercase text (the bot already sends everything in all caps
+// itself, so text-transform is only a harmless safety net here).
+// Case-insensitive since the source text is already all caps by the time
+// it gets here.
 function getRollLineClass(line) {
   if (/^\*\*Total/i.test(line)) return "roll-total-line";
-  if (/^\*\*(Overkill|Combat Drill):/i.test(line)) return "roll-uppercase-line";
+  if (/^\*\*Overkill:/i.test(line)) return "roll-overkill-line";
+  if (/^\*\*Combat Drill:/i.test(line)) return "roll-uppercase-line";
   return null;
 }
 
+// Total/Overkill render as their own boxed (display: block) rows -- a block
+// already starts on its own line, so an explicit <br> immediately before or
+// after one just adds an extra blank line. Skip the <br> at any transition
+// touching a boxed line; plain inline lines (Result, Combat Drill) still
+// get one between each other as before.
+const BOXED_LINE_CLASSES = new Set(["roll-total-line", "roll-overkill-line"]);
+
 function appendLiteMarkdown(container, text) {
   const lines = text.split("\n");
+  let previousLineClass = null;
   lines.forEach((line, i) => {
-    if (i > 0) {
+    const lineClass = getRollLineClass(line);
+    if (i > 0 && !BOXED_LINE_CLASSES.has(lineClass) && !BOXED_LINE_CLASSES.has(previousLineClass)) {
       container.appendChild(document.createElement("br"));
     }
     // Wrap just this line's content in its own span rather than appending
     // straight into the shared container, so it can get its own styling.
-    const lineClass = getRollLineClass(line);
     const target = lineClass ? document.createElement("span") : container;
     if (lineClass) {
       target.className = lineClass;
@@ -309,6 +322,7 @@ function appendLiteMarkdown(container, text) {
     if (lineClass) {
       container.appendChild(target);
     }
+    previousLineClass = lineClass;
   });
 }
 
@@ -783,6 +797,38 @@ els.damageDeleteRollBtn.addEventListener("click", () => {
   savedDamageRolls = savedDamageRolls.filter((r) => r.name !== name);
   localStorage.setItem(SAVED_DAMAGE_ROLLS_STORAGE_KEY, JSON.stringify(savedDamageRolls));
   renderSavedDamageRolls();
+});
+
+const CLEAR_SAVED_ROLLS_LABEL = "Clear all saved rolls";
+const CANCEL_CLEAR_SAVED_ROLLS_LABEL = "Nevermind";
+
+// First click just reveals "Are you sure?" (clicking again hides it, i.e.
+// cancels); only confirming actually clears anything. The button's width is
+// locked (measured while it still shows the longer label) before swapping
+// to "Nevermind", so it doesn't shrink to fit the shorter text.
+els.clearSavedRollsBtn.addEventListener("click", () => {
+  const nowHidden = els.confirmClearSavedRollsBtn.classList.toggle("hidden");
+  if (nowHidden) {
+    els.clearSavedRollsBtn.textContent = CLEAR_SAVED_ROLLS_LABEL;
+    els.clearSavedRollsBtn.style.width = "";
+  } else {
+    els.clearSavedRollsBtn.style.width = `${els.clearSavedRollsBtn.offsetWidth}px`;
+    els.clearSavedRollsBtn.textContent = CANCEL_CLEAR_SAVED_ROLLS_LABEL;
+  }
+});
+
+els.confirmClearSavedRollsBtn.addEventListener("click", () => {
+  savedRolls = [];
+  localStorage.removeItem(SAVED_ROLLS_STORAGE_KEY);
+  renderSavedRolls();
+
+  savedDamageRolls = [];
+  localStorage.removeItem(SAVED_DAMAGE_ROLLS_STORAGE_KEY);
+  renderSavedDamageRolls();
+
+  els.confirmClearSavedRollsBtn.classList.add("hidden");
+  els.clearSavedRollsBtn.textContent = CLEAR_SAVED_ROLLS_LABEL;
+  els.clearSavedRollsBtn.style.width = "";
 });
 
 async function init() {
