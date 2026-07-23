@@ -405,6 +405,11 @@ button:disabled {
   cursor: default;
 }
 
+input:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 .confirm-danger-btn,
 .confirm-danger-btn:hover {
   border-color: var(--accent);

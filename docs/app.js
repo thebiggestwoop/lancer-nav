@@ -18,6 +18,7 @@ const MAX_HISTORY_ENTRIES = 20;
 const POLL_INTERVAL_MS = 2500;
 
 const els = {
+  pairDiscordSetting: document.getElementById("pair-discord-setting"),
   pairingCode: document.getElementById("pairing-code"),
   saveSettings: document.getElementById("save-settings"),
   settingsStatus: document.getElementById("settings-status"),
@@ -146,6 +147,27 @@ let pairingCode = "";
 let playerName = "Someone";
 let lastSeq = 0;
 let pollTimer = null;
+// Set once a poll of /updates actually succeeds against this pairing code
+// -- distinct from just having *a* code typed in, which could be stale,
+// mistyped, or for a bot that's since restarted. Reset to false any time
+// polling (re)starts, so "Linked" never lingers for a code that hasn't
+// actually been confirmed yet.
+let pairingVerified = false;
+
+// Per-browser master switch for the whole Discord integration -- off means
+// the pairing code field is disabled and neither announcing to Discord nor
+// polling for its rolls is ever attempted, so there's nothing to fail and
+// therefore no "couldn't post to Discord" warning is possible. Defaults on
+// so an already-linked room's existing pairing code keeps working after
+// this setting was introduced.
+const PAIR_DISCORD_STORAGE_KEY = "lancer-companion-pair-discord";
+let pairingEnabled = true;
+
+function loadPairDiscordSetting() {
+  const stored = localStorage.getItem(PAIR_DISCORD_STORAGE_KEY);
+  pairingEnabled = stored === null ? true : stored === "true";
+  els.pairDiscordSetting.checked = pairingEnabled;
+}
 
 function setStatus(el, message, isError) {
   el.textContent = message;
@@ -154,15 +176,34 @@ function setStatus(el, message, isError) {
 
 function applyConfigToInputs() {
   els.pairingCode.value = pairingCode || "";
-  const linked = Boolean(pairingCode);
+  els.pairingCode.disabled = !pairingEnabled;
+  els.saveSettings.disabled = !pairingEnabled;
+
+  if (!pairingEnabled) {
+    setStatus(els.settingsStatus, "Discord pairing is turned off -- rolling locally only.", false);
+    return;
+  }
+  if (!pairingCode) {
+    setStatus(els.settingsStatus, "Not linked -- rolling locally only.", false);
+    return;
+  }
   // Rolling works standalone either way -- this just says whether rolls
-  // also get posted to Discord, so an unlinked room isn't an error state.
+  // also get posted to Discord, so none of these are error states.
   setStatus(
     els.settingsStatus,
-    linked ? "Linked -- rolls also post to Discord." : "Not linked -- rolling locally only.",
+    pairingVerified ? "Linked -- rolls also post to Discord." : "Checking Discord link...",
     false,
   );
 }
+
+els.pairDiscordSetting.addEventListener("change", () => {
+  pairingEnabled = els.pairDiscordSetting.checked;
+  localStorage.setItem(PAIR_DISCORD_STORAGE_KEY, String(pairingEnabled));
+  applyConfigToInputs();
+  startPolling();
+});
+
+loadPairDiscordSetting();
 
 // Combat Drill is a specific weapon tag most players won't have -- its
 // checkbox stays out of the way until a player opts in via Settings. Purely
@@ -374,7 +415,7 @@ function addHistoryEntry(event) {
 }
 
 async function pollUpdates() {
-  if (!pairingCode) {
+  if (!pairingEnabled || !pairingCode) {
     return;
   }
   try {
@@ -383,15 +424,27 @@ async function pollUpdates() {
       addHistoryEntry(event);
     }
     lastSeq = data.seq;
+    if (!pairingVerified) {
+      pairingVerified = true;
+      applyConfigToInputs();
+    }
   } catch (err) {
-    // Non-fatal -- just try again on the next tick.
+    // Non-fatal -- just try again on the next tick. If this pairing code
+    // was previously confirmed working and has now started failing (bot
+    // restarted, code revoked, ...), stop claiming it's linked.
+    if (pairingVerified) {
+      pairingVerified = false;
+      applyConfigToInputs();
+    }
   }
 }
 
 function startPolling() {
   stopPolling();
   lastSeq = 0;
-  if (!pairingCode) {
+  pairingVerified = false;
+  applyConfigToInputs();
+  if (!pairingEnabled || !pairingCode) {
     return;
   }
   pollUpdates();
@@ -489,7 +542,7 @@ async function performLocalRoll(expression) {
     // Non-fatal -- other clients just won't see this particular roll live.
   });
 
-  if (!pairingCode) {
+  if (!pairingEnabled || !pairingCode) {
     return undefined;
   }
   try {
