@@ -26,6 +26,7 @@ const els = {
   resetAllBtn: document.getElementById("reset-all-btn"),
   showCombatDrillSetting: document.getElementById("show-combat-drill-setting"),
   showDiceIconsSetting: document.getElementById("show-dice-icons-setting"),
+  clearAfterRollSetting: document.getElementById("clear-after-roll-setting"),
   exportSavedRollsBtn: document.getElementById("export-saved-rolls-btn"),
   importSavedRollsBtn: document.getElementById("import-saved-rolls-btn"),
   importSavedRollsFile: document.getElementById("import-saved-rolls-file"),
@@ -263,6 +264,23 @@ els.showDiceIconsSetting.addEventListener("change", () => {
 });
 
 loadShowDiceIconsSetting();
+
+// Runs clearAllFields() (see below) after every roll -- off by default,
+// since most players want their fields to stick around between rolls.
+const CLEAR_AFTER_ROLL_STORAGE_KEY = "lancer-companion-clear-after-roll";
+let clearAfterRoll = false;
+
+function loadClearAfterRollSetting() {
+  clearAfterRoll = localStorage.getItem(CLEAR_AFTER_ROLL_STORAGE_KEY) === "true";
+  els.clearAfterRollSetting.checked = clearAfterRoll;
+}
+
+els.clearAfterRollSetting.addEventListener("change", () => {
+  clearAfterRoll = els.clearAfterRollSetting.checked;
+  localStorage.setItem(CLEAR_AFTER_ROLL_STORAGE_KEY, String(clearAfterRoll));
+});
+
+loadClearAfterRollSetting();
 
 // event.timestamp is Unix epoch seconds -- stamped by event_bus.py for
 // rolls made in Discord, or by performLocalRoll() itself for rolls made
@@ -564,19 +582,26 @@ async function performLocalRoll(expression, titleOverride) {
     // Non-fatal -- other clients just won't see this particular roll live.
   });
 
-  if (!pairingEnabled || !pairingCode) {
-    return undefined;
+  let warning;
+  if (pairingEnabled && pairingCode) {
+    try {
+      await postJson(`/api/${pairingCode}/announce`, {
+        result: safeResult,
+        expression,
+        player_name: playerName,
+      });
+    } catch (err) {
+      warning = `Rolled, but couldn't post to Discord: ${err.message}`;
+    }
   }
-  try {
-    await postJson(`/api/${pairingCode}/announce`, {
-      result: safeResult,
-      expression,
-      player_name: playerName,
-    });
-    return undefined;
-  } catch (err) {
-    return `Rolled, but couldn't post to Discord: ${err.message}`;
+
+  // Only reached once the roll itself has actually happened (an invalid
+  // expression throws earlier, above, and never gets here).
+  if (clearAfterRoll) {
+    clearAllFields();
   }
+
+  return warning;
 }
 
 els.saveSettings.addEventListener("click", withBusy(els.saveSettings, savePairingCode));
@@ -785,7 +810,12 @@ els.damageKeepAll.addEventListener("click", () => setDamageKeepMode(""));
 els.damageKeepHigh.addEventListener("click", () => setDamageKeepMode("h"));
 els.damageKeepLow.addEventListener("click", () => setDamageKeepMode("l"));
 
-els.resetAllBtn.addEventListener("click", () => {
+// Shared by the Clear button and the "Clear after every roll" setting.
+// Resets the dropdowns' current *selection* back to the placeholder -- the
+// saved rolls themselves (the actual data) are untouched, same as
+// everything else in here; only "Clear all saved rolls" in Settings
+// deletes saved rolls.
+function clearAllFields() {
   els.checkModifier.value = "+0";
   els.checkAccuracy.value = "0";
   els.checkDifficulty.value = "0";
@@ -797,14 +827,12 @@ els.resetAllBtn.addEventListener("click", () => {
   els.damageCombatDrill.checked = false;
   els.damageOverkill.checked = false;
   els.rollExpression.value = "";
-  // Resets the dropdowns' current *selection* back to the placeholder --
-  // the saved rolls themselves (the actual data) are untouched, same as
-  // everything else in here; only "Clear all saved rolls" in Settings
-  // deletes saved rolls.
   els.savedRollsSelect.value = "";
   els.damageSavedRollsSelect.value = "";
   setStatus(els.globalStatus, "", false);
-});
+}
+
+els.resetAllBtn.addEventListener("click", clearAllFields);
 
 els.damageD2Btn.addEventListener(
   "click",
@@ -937,7 +965,7 @@ els.exportSavedRollsBtn.addEventListener(
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "lancer-companion-saved-rolls.json";
+    a.download = "lancer-nav-saved-rolls.json";
     a.click();
     URL.revokeObjectURL(url);
   })

@@ -1,6 +1,6 @@
-# Lancer Companion
+# Lancer Nav
 
-A dice-rolling companion for the *Lancer* tabletop RPG. Lancer Companion is two independent tools, sharing the exact same roll rules: a Discord bot, and an Owlbear Rodeo extension. Each works completely on its own — pair them together and every roll made in one also appears in the other.
+A dice-rolling companion for the *Lancer* tabletop RPG. Lancer Nav is two independent tools, sharing the exact same roll rules: a Discord bot, and an Owlbear Rodeo extension. Each works completely on its own — pair them together and every roll made in one also appears in the other.
 
 **Add the bot to Discord:** [Add to Discord](https://discord.com/oauth2/authorize?client_id=1528810293663371464&scope=bot&permissions=330752) — then run `l!h` in any channel for the command list, or `l!link` to pair the Owlbear extension.
 
@@ -124,7 +124,7 @@ docs/               The Owlbear extension (static site, hosted via GitHub Pages)
   diceLogic.js        JS port of lancer_logic.py's rolling/parsing rules
   style.css           Popover styling
   icon.svg            Toolbar/action icon
-  lancer-companion-logo.png  Main extension logo
+  lancer-nav-logo.png  Main extension logo
   icons/              d20_1.png..d20_20.png, d6_1.png..d6_6.png -- dice-face art for Roll History
   terms.html          Terms of Service
   privacy.html        Privacy Policy

@@ -1,4 +1,4 @@
-"""Lancer companion Discord bot: a single flexible `!r` command that rolls
+"""Lancer Nav Discord bot: a single flexible `!r` command that rolls
 either a d20 check (Accuracy/Difficulty) or a damage expression, auto-
 detecting which based on the expression -- see lancer_logic.py for the
 parsing/rolling rules themselves.
