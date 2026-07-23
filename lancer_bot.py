@@ -45,14 +45,14 @@ async def roll(ctx, *, expression: str):
     try:
         result = ll.perform_roll(expression)
     except ll.LancerError as e:
-        await ctx.send(f"{ctx.author.mention}\n**Error:** {e}")
+        await ctx.send(f"{ctx.author.mention}\n**ERROR:** {str(e).upper()}")
         return
 
     # Sent emoji-only (no text) so Discord renders the dice faces at large size
     for chunk in ll.roll_emoji_chunks(result):
         await ctx.send(chunk)
 
-    text = ll.format_roll_discord(result)
+    text = ll.format_roll_discord_shouted(result)
     await ctx.send(f"{ctx.author.mention}\n{text}")
 
     event_bus.publish(ctx.guild.id, {
@@ -70,7 +70,9 @@ async def roll(ctx, *, expression: str):
 async def link(ctx):
     code = generate_pairing_code()
     pairing_codes[code] = {"guild_id": ctx.guild.id, "channel_id": ctx.channel.id}
-    await ctx.send(f"{ctx.author.mention}\n**Owlbear pairing code:** {code}")
+    # The code itself keeps its exact case -- it's matched verbatim against
+    # pairing_codes elsewhere, unlike the surrounding label text.
+    await ctx.send(f"{ctx.author.mention}\n**OWLBEAR PAIRING CODE:** {code}")
 
 
 @bot.command(name="h")
@@ -95,15 +97,17 @@ async def on_ready():
 
 @bot.event
 async def on_command_error(ctx, error):
+    # `l!h` and the argument name stay in backticks/lowercase since they're
+    # literal syntax the user would type or look up, not prose.
     if isinstance(error, commands.NoPrivateMessage):
-        await ctx.send(f"{ctx.author.mention}\n**Error:** This command can't be used in DMs.")
+        await ctx.send(f"{ctx.author.mention}\n**ERROR:** THIS COMMAND CAN'T BE USED IN DMS.")
     elif isinstance(error, commands.MissingRequiredArgument):
-        await ctx.send(f"{ctx.author.mention}\n**Error:** Missing argument: `{error.param.name}`. Try `l!h` for usage.")
+        await ctx.send(f"{ctx.author.mention}\n**ERROR:** MISSING ARGUMENT: `{error.param.name}`. TRY `l!h` FOR USAGE.")
     elif isinstance(error, commands.CommandNotFound):
         pass
     else:
         logging.error(f"Unhandled error in command '{ctx.command}': {error}")
-        await ctx.send(f"{ctx.author.mention}\n**Error:** Something went wrong running that command.")
+        await ctx.send(f"{ctx.author.mention}\n**ERROR:** SOMETHING WENT WRONG RUNNING THAT COMMAND.")
 
 
 def load_token():

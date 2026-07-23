@@ -2,9 +2,13 @@
   color-scheme: light dark;
   --bg: #ffffff;
   --fg: #1e1f22;
-  --card-bg: #202225;
+  /* A light-gray elevated panel in light mode (mirrors Discord's own light
+     theme secondary background), and the existing dark panel in dark mode
+     -- --fg already flips alongside it, so card text just works in both. */
+  --card-bg: #f2f3f5;
   --border: #d4d6da;
   --accent: #802932;
+  --accent-2: #283593;
   --accent-text: #ffffff;
   --error: #d83c3e;
   --mono-font: Consolas, monospace;
@@ -14,6 +18,7 @@
   :root {
     --bg: #313338;
     --fg: #f2f3f5;
+    --card-bg: #202225;
     --border: #1e1f22;
   }
 }
@@ -144,6 +149,7 @@ select {
 
 .checkbox-field input {
   width: auto;
+  accent-color: var(--accent-2);
 }
 
 .d20-controls-row {
@@ -163,11 +169,29 @@ select {
   opacity: 0.8;
 }
 
-.modifier-control,
-.tally-control {
+.modifier-control {
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.tally-control {
+  display: flex;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.tally-field-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Field (26) + gap (2) + minus (12) = 40 -- matches .tally-btn's height, so
+   the field's top and the minus button's bottom both line up with it. */
+.tally-field-stack .stack-btn-minus {
+  width: 40px;
 }
 
 .step-btn {
@@ -228,11 +252,21 @@ select {
   font-family: var(--mono-font);
 }
 
+/* Width/font/etc. come from .modifier-input (shared class, in markup) --
+   height is shortened so field + gap + minus button == .tally-btn's height,
+   lining up the field's top and the minus button's bottom with it. */
 .tally-input {
-  width: 34px;
-  padding: 4px 2px;
-  text-align: center;
-  font-family: var(--mono-font);
+  height: 26px;
+  /* The custom hex "Add" button already increments, and the new minus
+     button below decrements -- the native spinner is redundant. */
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.tally-input::-webkit-inner-spin-button,
+.tally-input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .tally-btn {
@@ -253,7 +287,7 @@ select {
 }
 
 .tally-btn:hover .tally-icon {
-  color: var(--accent);
+  color: var(--accent-2);
 }
 
 .xdx-controls-row {
@@ -358,7 +392,7 @@ button {
 }
 
 button:hover {
-  border-color: var(--accent);
+  border-color: var(--accent-2);
 }
 
 .btn-primary {
@@ -371,6 +405,7 @@ button:hover {
 }
 
 .btn-primary:hover {
+  border-color: var(--accent);
   filter: brightness(1.1);
 }
 
@@ -418,6 +453,15 @@ button:disabled {
   margin-top: 2px;
 }
 
+.roll-total-line {
+  font-size: 16px;
+  text-transform: uppercase;
+}
+
+.roll-uppercase-line {
+  text-transform: uppercase;
+}
+
 .dice-faces {
   display: flex;
   flex-wrap: wrap;
@@ -425,7 +469,17 @@ button:disabled {
   margin: 2px 0;
 }
 
+.hide-dice-icons .dice-faces {
+  display: none;
+}
+
 .dice-face-icon {
   width: 36px;
   height: 36px;
+}
+
+/* Must stay last: relies on cascade order (not just specificity) to beat
+   other single-class rules like .checkbox-field's `display: flex`. */
+.hidden {
+  display: none;
 }

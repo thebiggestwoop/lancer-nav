@@ -19,6 +19,14 @@
     </div>
     <button id="save-settings">Save</button>
     <p id="settings-status" class="status"></p>
+    <label class="checkbox-field">
+      <input id="show-combat-drill-setting" type="checkbox" />
+      Show Combat Drill
+    </label>
+    <label class="checkbox-field">
+      <input id="show-dice-icons-setting" type="checkbox" checked />
+      Show Dice Icons
+    </label>
   </details>
 
   <section class="card">
@@ -47,7 +55,10 @@
               <rect x="28" y="42" width="44" height="16" fill="currentColor"/>
             </svg>
           </button>
-          <input id="check-accuracy" type="number" value="0" min="0" step="1" class="tally-input" />
+          <div class="tally-field-stack">
+            <input id="check-accuracy" type="number" value="0" min="0" step="1" class="modifier-input tally-input" />
+            <button id="check-accuracy-minus" class="stack-btn stack-btn-minus" type="button" aria-label="Decrease Accuracy">&minus;</button>
+          </div>
         </div>
       </div>
       <div class="stat-group">
@@ -59,7 +70,10 @@
               <rect x="28" y="42" width="44" height="16" fill="currentColor"/>
             </svg>
           </button>
-          <input id="check-difficulty" type="number" value="0" min="0" step="1" class="tally-input" />
+          <div class="tally-field-stack">
+            <input id="check-difficulty" type="number" value="0" min="0" step="1" class="modifier-input tally-input" />
+            <button id="check-difficulty-minus" class="stack-btn stack-btn-minus" type="button" aria-label="Decrease Difficulty">&minus;</button>
+          </div>
         </div>
       </div>
     </div>
@@ -76,7 +90,6 @@
   </section>
 
   <section class="card">
-    <h2>XdX</h2>
     <div class="row xdx-controls-row">
       <div class="stat-group">
         <label for="damage-d6">d6</label>
@@ -121,14 +134,25 @@
           <input id="damage-crit" type="checkbox" />
           Crit
         </label>
+        <label id="combat-drill-field" class="checkbox-field hidden">
+          <input id="damage-combat-drill" type="checkbox" />
+          Combat Drill
+        </label>
         <label class="checkbox-field">
           <input id="damage-overkill" type="checkbox" />
           Overkill
         </label>
       </div>
     </div>
+    <div class="row saved-roll-row">
+      <select id="damage-saved-rolls-select" class="saved-rolls-select">
+        <option value="">Saved rolls...</option>
+      </select>
+      <button id="damage-delete-roll-btn" type="button" class="delete-roll-btn" title="Delete selected saved roll" aria-label="Delete selected saved roll">&times;</button>
+    </div>
     <div class="row d2-row">
       <button id="damage-d2-btn" class="quick-die-btn" type="button">d2</button>
+      <button id="damage-save-roll-btn" type="button" class="save-roll-btn">Save Roll</button>
       <button id="damage-roll-btn" class="btn-primary">Roll</button>
     </div>
   </section>

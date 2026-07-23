@@ -85,7 +85,7 @@ def create_app(bot, pairing_codes):
 
         safe_result = ll.result_to_json_safe(result)
         actor = data.get("player_name") or "Someone"
-        text = ll.format_roll_discord(result)
+        text = ll.format_roll_discord_shouted(result)
 
         channel = await _get_channel(bot, pairing["channel_id"])
 
@@ -94,6 +94,9 @@ def create_app(bot, pairing_codes):
         for chunk in ll.roll_emoji_chunks(result):
             await channel.send(chunk)
 
+        # _attribution() is the one exception left un-uppercased -- it's
+        # just the "(via Owlbear)" note next to the player's name, not the
+        # bot speaking.
         await channel.send(f"{_attribution(actor)}\n{text}")
 
         event_bus.publish(pairing["guild_id"], {

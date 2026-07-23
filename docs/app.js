@@ -17,6 +17,8 @@ const els = {
   settingsStatus: document.getElementById("settings-status"),
   globalStatus: document.getElementById("global-status"),
   resetAllBtn: document.getElementById("reset-all-btn"),
+  showCombatDrillSetting: document.getElementById("show-combat-drill-setting"),
+  showDiceIconsSetting: document.getElementById("show-dice-icons-setting"),
 
   rollHistory: document.getElementById("roll-history"),
 
@@ -28,8 +30,10 @@ const els = {
   checkModifierPlus: document.getElementById("check-modifier-plus"),
   checkAccuracy: document.getElementById("check-accuracy"),
   checkAccuracyAdd: document.getElementById("check-accuracy-add"),
+  checkAccuracyMinus: document.getElementById("check-accuracy-minus"),
   checkDifficulty: document.getElementById("check-difficulty"),
   checkDifficultyAdd: document.getElementById("check-difficulty-add"),
+  checkDifficultyMinus: document.getElementById("check-difficulty-minus"),
   checkRollBtn: document.getElementById("check-roll-btn"),
   savedRollsSelect: document.getElementById("saved-rolls-select"),
   saveRollBtn: document.getElementById("save-roll-btn"),
@@ -48,9 +52,14 @@ const els = {
   damageKeepHigh: document.getElementById("damage-keep-high"),
   damageKeepLow: document.getElementById("damage-keep-low"),
   damageCrit: document.getElementById("damage-crit"),
+  combatDrillField: document.getElementById("combat-drill-field"),
+  damageCombatDrill: document.getElementById("damage-combat-drill"),
   damageOverkill: document.getElementById("damage-overkill"),
   damageD2Btn: document.getElementById("damage-d2-btn"),
   damageRollBtn: document.getElementById("damage-roll-btn"),
+  damageSavedRollsSelect: document.getElementById("damage-saved-rolls-select"),
+  damageSaveRollBtn: document.getElementById("damage-save-roll-btn"),
+  damageDeleteRollBtn: document.getElementById("damage-delete-roll-btn"),
 };
 
 // The structured Check/Damage forms don't talk to the backend directly --
@@ -94,7 +103,7 @@ function buildCheckExpression(modifier, accuracy, difficulty) {
 // dice in them -- e.g. 2d6 + 1d3 with Keep: High keeps the highest of the
 // 2d6 *and* the highest of the 1d3 (trivially itself), not a single winner
 // picked across the combined pool.
-function buildDamageExpression(numD6, numD3, flat, keepMode, crit, overkill) {
+function buildDamageExpression(numD6, numD3, flat, keepMode, crit, overkill, combatDrill) {
   const diceParts = [];
   if (numD6 > 0) {
     diceParts.push(keepMode ? `${numD6}d6k${keepMode}1` : `${numD6}d6`);
@@ -113,8 +122,13 @@ function buildDamageExpression(numD6, numD3, flat, keepMode, crit, overkill) {
   if (crit) {
     expr = expr ? `${expr} crit` : "crit";
   }
+  // Combat Drill implies Overkill (see lancer_logic.py), but the checkbox is
+  // sent too so the expression reads the same either way.
   if (overkill) {
     expr = expr ? `${expr} overkill` : "overkill";
+  }
+  if (combatDrill) {
+    expr = expr ? `${expr} combatdrill` : "combatdrill";
   }
   return expr;
 }
@@ -134,6 +148,62 @@ function applyConfigToInputs() {
   const linked = Boolean(pairingCode);
   setStatus(els.settingsStatus, linked ? "Linked." : "Not linked yet.", !linked);
 }
+
+// Combat Drill is a specific weapon tag most players won't have -- its
+// checkbox stays out of the way until a player opts in via Settings. Purely
+// a per-browser display preference (not synced through the room, unlike the
+// pairing code), since different players carry different gear.
+const SHOW_COMBAT_DRILL_STORAGE_KEY = "lancer-companion-show-combat-drill";
+
+function applyCombatDrillVisibility(show) {
+  els.combatDrillField.classList.toggle("hidden", !show);
+  if (!show) {
+    els.damageCombatDrill.checked = false;
+  }
+}
+
+function loadShowCombatDrillSetting() {
+  const show = localStorage.getItem(SHOW_COMBAT_DRILL_STORAGE_KEY) === "true";
+  els.showCombatDrillSetting.checked = show;
+  applyCombatDrillVisibility(show);
+}
+
+els.showCombatDrillSetting.addEventListener("change", () => {
+  const show = els.showCombatDrillSetting.checked;
+  localStorage.setItem(SHOW_COMBAT_DRILL_STORAGE_KEY, String(show));
+  applyCombatDrillVisibility(show);
+});
+
+loadShowCombatDrillSetting();
+
+// Dice-face icons in Roll History are a purely visual, client-side thing --
+// each player can turn them off individually without affecting what anyone
+// else in the room sees. The icon rows are always built into the DOM as
+// normal (see addHistoryEntry() below); a single CSS class on the list
+// container hides them, so toggling the setting instantly affects every
+// entry already on screen too, not just future ones -- no event cache or
+// rebuild needed. Defaults to on (unlike Combat Drill) since that's the
+// existing behavior this setting is opting players out of, not into.
+const SHOW_DICE_ICONS_STORAGE_KEY = "lancer-companion-show-dice-icons";
+
+function applyShowDiceIcons(show) {
+  els.rollHistory.classList.toggle("hide-dice-icons", !show);
+}
+
+function loadShowDiceIconsSetting() {
+  const stored = localStorage.getItem(SHOW_DICE_ICONS_STORAGE_KEY);
+  const show = stored === null ? true : stored === "true";
+  els.showDiceIconsSetting.checked = show;
+  applyShowDiceIcons(show);
+}
+
+els.showDiceIconsSetting.addEventListener("change", () => {
+  const show = els.showDiceIconsSetting.checked;
+  localStorage.setItem(SHOW_DICE_ICONS_STORAGE_KEY, String(show));
+  applyShowDiceIcons(show);
+});
+
+loadShowDiceIconsSetting();
 
 // event.timestamp is Unix epoch seconds (set server-side by event_bus.py).
 // Rendering it here, client-side, means each viewer sees it in their own
@@ -197,26 +267,47 @@ function buildDiceFacesRow(faces) {
 // event.text is the Discord-formatted string the bot posts, which only ever
 // uses **bold** and ~~strikethrough~~. Rendered by building real DOM nodes
 // (never innerHTML) so nothing in the text can be parsed as HTML.
+// Lines from lancer_logic.py's format_*_discord() always start with one of
+// these bolded labels -- Total gets a larger font size (the bot already
+// sends everything in all caps itself, matching the Discord messages, so
+// no text-transform is needed here). Case-insensitive since the source
+// text is already all caps by the time it gets here.
+function getRollLineClass(line) {
+  if (/^\*\*Total/i.test(line)) return "roll-total-line";
+  if (/^\*\*(Overkill|Combat Drill):/i.test(line)) return "roll-uppercase-line";
+  return null;
+}
+
 function appendLiteMarkdown(container, text) {
   const lines = text.split("\n");
   lines.forEach((line, i) => {
     if (i > 0) {
       container.appendChild(document.createElement("br"));
     }
+    // Wrap just this line's content in its own span rather than appending
+    // straight into the shared container, so it can get its own styling.
+    const lineClass = getRollLineClass(line);
+    const target = lineClass ? document.createElement("span") : container;
+    if (lineClass) {
+      target.className = lineClass;
+    }
     const re = /\*\*(.+?)\*\*|~~(.+?)~~/g;
     let lastIndex = 0;
     let match;
     while ((match = re.exec(line)) !== null) {
       if (match.index > lastIndex) {
-        container.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
+        target.appendChild(document.createTextNode(line.slice(lastIndex, match.index)));
       }
       const el = document.createElement(match[1] !== undefined ? "strong" : "s");
       el.textContent = match[1] !== undefined ? match[1] : match[2];
-      container.appendChild(el);
+      target.appendChild(el);
       lastIndex = re.lastIndex;
     }
     if (lastIndex < line.length) {
-      container.appendChild(document.createTextNode(line.slice(lastIndex)));
+      target.appendChild(document.createTextNode(line.slice(lastIndex)));
+    }
+    if (lineClass) {
+      container.appendChild(target);
     }
   });
 }
@@ -372,8 +463,16 @@ els.checkAccuracyAdd.addEventListener("click", () => {
   els.checkAccuracy.value = (Number(els.checkAccuracy.value) || 0) + 1;
 });
 
+els.checkAccuracyMinus.addEventListener("click", () => {
+  els.checkAccuracy.value = Math.max(0, (Number(els.checkAccuracy.value) || 0) - 1);
+});
+
 els.checkDifficultyAdd.addEventListener("click", () => {
   els.checkDifficulty.value = (Number(els.checkDifficulty.value) || 0) + 1;
+});
+
+els.checkDifficultyMinus.addEventListener("click", () => {
+  els.checkDifficulty.value = Math.max(0, (Number(els.checkDifficulty.value) || 0) - 1);
 });
 
 els.checkRollBtn.addEventListener(
@@ -426,14 +525,14 @@ function toBoldUnicode(text) {
   });
 }
 
-// Same trick, but the Unicode mathematical monospace block, for the dice
+// Same trick, but the Unicode mathematical sans-serif block, for the dice
 // expression following the name.
-function toMonospaceUnicode(text) {
+function toSansSerifUnicode(text) {
   return String(text).replace(/[A-Za-z0-9]/g, (ch) => {
     const code = ch.codePointAt(0);
-    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1d670 + (code - 65));
-    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1d68a + (code - 97));
-    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1d7f6 + (code - 48));
+    if (code >= 65 && code <= 90) return String.fromCodePoint(0x1d5a0 + (code - 65));
+    if (code >= 97 && code <= 122) return String.fromCodePoint(0x1d5ba + (code - 97));
+    if (code >= 48 && code <= 57) return String.fromCodePoint(0x1d7e2 + (code - 48));
     return ch;
   });
 }
@@ -447,7 +546,7 @@ function renderSavedRolls(selectedName) {
     const option = document.createElement("option");
     option.value = roll.name;
     const expression = buildCheckExpression(roll.modifier, roll.accuracy, roll.difficulty);
-    option.textContent = `${toBoldUnicode(roll.name)}  ${toMonospaceUnicode(expression)}`;
+    option.textContent = `${toBoldUnicode(roll.name)}  [${toSansSerifUnicode(expression)}]`;
     return option;
   });
 
@@ -555,6 +654,7 @@ els.resetAllBtn.addEventListener("click", () => {
   els.damageFlat.value = "+0";
   setDamageKeepMode("");
   els.damageCrit.checked = false;
+  els.damageCombatDrill.checked = false;
   els.damageOverkill.checked = false;
   els.rollExpression.value = "";
   setStatus(els.globalStatus, "", false);
@@ -578,13 +678,112 @@ els.damageRollBtn.addEventListener(
     const flat = parseModifier(els.damageFlat.value);
     const crit = els.damageCrit.checked;
     const overkill = els.damageOverkill.checked;
-    const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit, overkill);
+    const combatDrill = els.damageCombatDrill.checked;
+    const expression = buildDamageExpression(numD6, numD3, flat, damageKeepMode, crit, overkill, combatDrill);
     await postJson(`/api/${pairingCode}/roll`, {
       expression,
       player_name: playerName,
     });
+    // Same reasoning as the d20 card's saved rolls: clear the selection only
+    // once it's actually been rolled, so picking the same saved roll again
+    // afterward fires a fresh "change" event.
+    els.damageSavedRollsSelect.value = "";
   })
 );
+
+// Saved rolls for the XdX card -- same client-side-only convenience as the
+// d20 card's, kept in its own localStorage key since a damage roll's shape
+// (dice counts, Keep mode, Crit, Overkill) is entirely different from a
+// check's (Modifier/Accuracy/Difficulty).
+const SAVED_DAMAGE_ROLLS_STORAGE_KEY = "lancer-companion-saved-damage-rolls";
+
+function loadSavedDamageRolls() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SAVED_DAMAGE_ROLLS_STORAGE_KEY));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+let savedDamageRolls = loadSavedDamageRolls();
+
+function renderSavedDamageRolls(selectedName) {
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Saved rolls...";
+
+  const options = savedDamageRolls.map((roll) => {
+    const option = document.createElement("option");
+    option.value = roll.name;
+    let expression = "";
+    try {
+      expression = buildDamageExpression(
+        roll.numD6, roll.numD3, roll.flat, roll.keepMode, roll.crit, roll.overkill, roll.combatDrill,
+      );
+    } catch {
+      expression = "";
+    }
+    option.textContent = expression
+      ? `${toBoldUnicode(roll.name)}  [${toSansSerifUnicode(expression)}]`
+      : toBoldUnicode(roll.name);
+    return option;
+  });
+
+  els.damageSavedRollsSelect.replaceChildren(placeholder, ...options);
+  els.damageSavedRollsSelect.value = selectedName ?? "";
+}
+
+renderSavedDamageRolls();
+
+els.damageSaveRollBtn.addEventListener("click", () => {
+  const name = prompt("Name this roll:");
+  if (name === null) return;
+  const trimmed = name.trim();
+  if (trimmed === "") return;
+
+  const roll = {
+    name: trimmed,
+    numD6: parseDiceCount(els.damageD6.value),
+    numD3: parseDiceCount(els.damageD3.value),
+    flat: parseModifier(els.damageFlat.value),
+    keepMode: damageKeepMode,
+    crit: els.damageCrit.checked,
+    overkill: els.damageOverkill.checked,
+    combatDrill: els.damageCombatDrill.checked,
+  };
+
+  const existingIndex = savedDamageRolls.findIndex((r) => r.name === trimmed);
+  if (existingIndex === -1) {
+    savedDamageRolls.push(roll);
+  } else {
+    savedDamageRolls[existingIndex] = roll;
+  }
+  localStorage.setItem(SAVED_DAMAGE_ROLLS_STORAGE_KEY, JSON.stringify(savedDamageRolls));
+  renderSavedDamageRolls(trimmed);
+});
+
+els.damageSavedRollsSelect.addEventListener("change", () => {
+  const selected = savedDamageRolls.find(
+    (r) => r.name === els.damageSavedRollsSelect.value,
+  );
+  if (!selected) return;
+  els.damageD6.value = formatDiceCount(selected.numD6, 6);
+  els.damageD3.value = formatDiceCount(selected.numD3, 3);
+  els.damageFlat.value = formatModifier(selected.flat);
+  setDamageKeepMode(selected.keepMode);
+  els.damageCrit.checked = selected.crit;
+  els.damageOverkill.checked = selected.overkill;
+  els.damageCombatDrill.checked = Boolean(selected.combatDrill);
+});
+
+els.damageDeleteRollBtn.addEventListener("click", () => {
+  const name = els.damageSavedRollsSelect.value;
+  if (!name) return;
+  savedDamageRolls = savedDamageRolls.filter((r) => r.name !== name);
+  localStorage.setItem(SAVED_DAMAGE_ROLLS_STORAGE_KEY, JSON.stringify(savedDamageRolls));
+  renderSavedDamageRolls();
+});
 
 async function init() {
   playerName = (await OBR.player.getName()) || "Someone";
