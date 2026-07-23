@@ -70,9 +70,10 @@ async def roll(ctx, *, expression: str):
 async def link(ctx):
     code = generate_pairing_code()
     pairing_codes[code] = {"guild_id": ctx.guild.id, "channel_id": ctx.channel.id}
-    # The code itself keeps its exact case -- it's matched verbatim against
-    # pairing_codes elsewhere, unlike the surrounding label text.
-    await ctx.send(f"{ctx.author.mention}\n**OWLBEAR PAIRING CODE:** {code}")
+    # Not shouted (unlike roll results) -- this is a one-off setup message,
+    # not the bot "speaking" a result. Code shown in backticks/exact case,
+    # since it's matched verbatim against pairing_codes elsewhere.
+    await ctx.send(f"{ctx.author.mention}\n**Owlbear pairing code:** `{code}`")
 
 
 @bot.command(name="h")

@@ -548,13 +548,13 @@ def format_roll_discord(result):
     return format_damage_discord(result)
 
 
-_DICE_NOTATION_RE = re.compile(r"(\d+)D(\d+)")
+_DICE_NOTATION_RE = re.compile(r"\d+D\d+(?:K[HL]\d+)?")
 
 
 def format_roll_discord_shouted(result):
     """format_roll_discord(), but in all caps -- the bot speaks its roll
     results in all caps (same text either way, Discord command or Owlbear
-    extension), except the "d" in dice notation ("2d6", "1d20", ...) stays
-    lowercase so it still reads as dice notation rather than "2D6"."""
+    extension), except dice notation ("2d6", "1d20", "6d6kh1", ...) stays
+    lowercase so it still reads as dice notation rather than "2D6"/"6D6KH1"."""
     shouted = format_roll_discord(result).upper()
-    return _DICE_NOTATION_RE.sub(lambda m: f"{m.group(1)}d{m.group(2)}", shouted)
+    return _DICE_NOTATION_RE.sub(lambda m: m.group(0).lower(), shouted)
