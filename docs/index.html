@@ -30,23 +30,34 @@
     <button id="save-settings">Save</button>
     <p id="settings-status" class="status"></p>
     <label class="checkbox-field">
-      <input id="show-combat-drill-setting" type="checkbox" />
-      Show Combat Drill
-    </label>
-    <label class="checkbox-field">
       <input id="show-dice-icons-setting" type="checkbox" checked />
       Show Dice Icons
     </label>
     <label class="checkbox-field">
-      <input id="clear-after-roll-setting" type="checkbox" />
+      <input id="clear-after-roll-setting" type="checkbox" checked />
       Clear after every roll
     </label>
-    <div class="row">
-      <button id="export-saved-rolls-btn" type="button">Export saved rolls</button>
-      <button id="import-saved-rolls-btn" type="button">Import saved rolls</button>
-      <input id="import-saved-rolls-file" type="file" accept="application/json,.json" class="hidden" />
+    <label class="checkbox-field">
+      <input id="show-combat-drill-setting" type="checkbox" />
+      Show IPS-N Vlad Combat Drill
+    </label>
+    <div class="row accent-color-row">
+      <div class="field">
+        <label for="accent-color-setting">Accent color 1</label>
+        <input id="accent-color-setting" type="text" value="#802932" maxlength="7" />
+      </div>
+      <div class="field">
+        <label for="accent-color-2-setting">Accent color 2</label>
+        <input id="accent-color-2-setting" type="text" value="#283593" maxlength="7" />
+      </div>
+      <button id="reset-colors-btn" type="button" class="reset-colors-btn">Reset colors</button>
     </div>
     <div class="row">
+      <button id="export-saved-rolls-btn" type="button">Export Settings and Saved Rolls</button>
+      <button id="import-saved-rolls-btn" type="button">Import Settings and Saved Rolls</button>
+      <input id="import-saved-rolls-file" type="file" accept="application/json,.json" class="hidden" />
+    </div>
+    <div class="row clear-rolls-row">
       <button id="clear-saved-rolls-btn" type="button">Clear all saved rolls</button>
       <button id="confirm-clear-saved-rolls-btn" type="button" class="confirm-danger-btn hidden">Are you sure?</button>
     </div>
@@ -152,7 +163,7 @@
           <button id="damage-keep-low" class="keep-btn" type="button" data-keep="l">Low</button>
         </div>
       </div>
-      <button id="damage-d2-btn" class="quick-die-btn" type="button">d2</button>
+      <button id="damage-d2-btn" class="quick-die-btn" type="button">Roll d2</button>
       <div class="checkbox-group">
         <label class="checkbox-field">
           <input id="damage-crit" type="checkbox" />

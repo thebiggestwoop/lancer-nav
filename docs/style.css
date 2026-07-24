@@ -160,6 +160,24 @@ select {
   cursor: pointer;
 }
 
+#accent-color-setting,
+#accent-color-2-setting {
+  height: 28px;
+}
+
+.reset-colors-btn {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  height: 28px;
+  margin: 6px 0;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .settings-links-row {
   align-items: center;
   justify-content: space-between;
@@ -377,7 +395,7 @@ select {
 
 .quick-die-btn {
   flex: 0 0 auto;
-  width: 48px;
+  white-space: nowrap;
 }
 
 .saved-roll-row {
@@ -449,9 +467,19 @@ input:disabled {
   cursor: default;
 }
 
+#clear-saved-rolls-btn,
+.confirm-danger-btn {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
 .confirm-danger-btn,
 .confirm-danger-btn:hover {
   border-color: var(--accent);
+}
+
+.clear-rolls-row {
+  margin-top: 2px;
 }
 
 .roll-history {

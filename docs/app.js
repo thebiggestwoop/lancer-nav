@@ -27,6 +27,9 @@ const els = {
   showCombatDrillSetting: document.getElementById("show-combat-drill-setting"),
   showDiceIconsSetting: document.getElementById("show-dice-icons-setting"),
   clearAfterRollSetting: document.getElementById("clear-after-roll-setting"),
+  accentColorSetting: document.getElementById("accent-color-setting"),
+  accentColor2Setting: document.getElementById("accent-color-2-setting"),
+  resetColorsBtn: document.getElementById("reset-colors-btn"),
   exportSavedRollsBtn: document.getElementById("export-saved-rolls-btn"),
   importSavedRollsBtn: document.getElementById("import-saved-rolls-btn"),
   importSavedRollsFile: document.getElementById("import-saved-rolls-file"),
@@ -265,13 +268,13 @@ els.showDiceIconsSetting.addEventListener("change", () => {
 
 loadShowDiceIconsSetting();
 
-// Runs clearAllFields() (see below) after every roll -- off by default,
-// since most players want their fields to stick around between rolls.
+// Runs clearAllFields() (see below) after every roll -- on by default.
 const CLEAR_AFTER_ROLL_STORAGE_KEY = "lancer-companion-clear-after-roll";
-let clearAfterRoll = false;
+let clearAfterRoll = true;
 
 function loadClearAfterRollSetting() {
-  clearAfterRoll = localStorage.getItem(CLEAR_AFTER_ROLL_STORAGE_KEY) === "true";
+  const stored = localStorage.getItem(CLEAR_AFTER_ROLL_STORAGE_KEY);
+  clearAfterRoll = stored === null ? true : stored === "true";
   els.clearAfterRollSetting.checked = clearAfterRoll;
 }
 
@@ -281,6 +284,61 @@ els.clearAfterRollSetting.addEventListener("change", () => {
 });
 
 loadClearAfterRollSetting();
+
+// Lets each player re-theme the extension to taste. Applied as inline
+// custom-property overrides on the root element, so they win over the
+// stylesheet's defaults in both light and dark mode without touching CSS.
+const DEFAULT_ACCENT = "#802932";
+const DEFAULT_ACCENT_2 = "#283593";
+const ACCENT_COLOR_STORAGE_KEY = "lancer-nav-accent-color";
+const ACCENT_COLOR_2_STORAGE_KEY = "lancer-nav-accent-color-2";
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+function loadAccentColorSetting() {
+  const stored = localStorage.getItem(ACCENT_COLOR_STORAGE_KEY);
+  const hex = stored && HEX_COLOR_RE.test(stored) ? stored : DEFAULT_ACCENT;
+  els.accentColorSetting.value = hex;
+  document.documentElement.style.setProperty("--accent", hex);
+}
+
+function loadAccentColor2Setting() {
+  const stored = localStorage.getItem(ACCENT_COLOR_2_STORAGE_KEY);
+  const hex = stored && HEX_COLOR_RE.test(stored) ? stored : DEFAULT_ACCENT_2;
+  els.accentColor2Setting.value = hex;
+  document.documentElement.style.setProperty("--accent-2", hex);
+}
+
+els.accentColorSetting.addEventListener("change", () => {
+  const hex = els.accentColorSetting.value.trim();
+  if (!HEX_COLOR_RE.test(hex)) {
+    setStatus(els.settingsStatus, "Accent color 1 must be a hex code like #802932.", true);
+    loadAccentColorSetting();
+    return;
+  }
+  localStorage.setItem(ACCENT_COLOR_STORAGE_KEY, hex);
+  document.documentElement.style.setProperty("--accent", hex);
+});
+
+els.accentColor2Setting.addEventListener("change", () => {
+  const hex = els.accentColor2Setting.value.trim();
+  if (!HEX_COLOR_RE.test(hex)) {
+    setStatus(els.settingsStatus, "Accent color 2 must be a hex code like #283593.", true);
+    loadAccentColor2Setting();
+    return;
+  }
+  localStorage.setItem(ACCENT_COLOR_2_STORAGE_KEY, hex);
+  document.documentElement.style.setProperty("--accent-2", hex);
+});
+
+els.resetColorsBtn.addEventListener("click", () => {
+  localStorage.removeItem(ACCENT_COLOR_STORAGE_KEY);
+  localStorage.removeItem(ACCENT_COLOR_2_STORAGE_KEY);
+  loadAccentColorSetting();
+  loadAccentColor2Setting();
+});
+
+loadAccentColorSetting();
+loadAccentColor2Setting();
 
 // event.timestamp is Unix epoch seconds -- stamped by event_bus.py for
 // rolls made in Discord, or by performLocalRoll() itself for rolls made
@@ -949,17 +1007,28 @@ els.damageDeleteRollBtn.addEventListener("click", () => {
   renderSavedDamageRolls();
 });
 
-// Export/Import saved rolls -- lets a player back up their saved d20/XdX
-// presets or move them to another browser, since they otherwise only live
-// in this browser's localStorage. Import merges into whatever's already
-// saved here (overwriting by name, same rule the Save Roll buttons already
-// use), rather than replacing it outright.
+// Export/Import saved rolls + settings -- lets a player back up their saved
+// d20/XdX presets and display preferences, or move them to another browser,
+// since they otherwise only live in this browser's localStorage. Discord
+// pairing is deliberately excluded -- a pairing code is tied to a specific
+// Discord channel, not a personal preference, so it shouldn't ride along
+// with a settings backup or get overwritten by importing someone else's.
+// Import merges saved rolls into whatever's already here (overwriting by
+// name, same rule the Save Roll buttons already use) and overwrites settings
+// outright, rather than replacing saved rolls outright.
 els.exportSavedRollsBtn.addEventListener(
   "click",
   withBusy(els.exportSavedRollsBtn, () => {
     const payload = {
       d20Rolls: savedRolls,
       damageRolls: savedDamageRolls,
+      settings: {
+        showCombatDrill: els.showCombatDrillSetting.checked,
+        showDiceIcons: els.showDiceIconsSetting.checked,
+        clearAfterRoll: els.clearAfterRollSetting.checked,
+        accentColor: els.accentColorSetting.value,
+        accentColor2: els.accentColor2Setting.value,
+      },
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -1020,13 +1089,48 @@ els.importSavedRollsFile.addEventListener("change", async () => {
       renderSavedDamageRolls();
     }
 
-    if (importedD20.length === 0 && importedDamage.length === 0) {
-      throw new Error("No saved rolls found in that file.");
+    let importedSettingsCount = 0;
+    const settings = parsed.settings;
+    if (settings && typeof settings === "object") {
+      if (typeof settings.showCombatDrill === "boolean") {
+        localStorage.setItem(SHOW_COMBAT_DRILL_STORAGE_KEY, String(settings.showCombatDrill));
+        els.showCombatDrillSetting.checked = settings.showCombatDrill;
+        applyCombatDrillVisibility(settings.showCombatDrill);
+        importedSettingsCount++;
+      }
+      if (typeof settings.showDiceIcons === "boolean") {
+        localStorage.setItem(SHOW_DICE_ICONS_STORAGE_KEY, String(settings.showDiceIcons));
+        els.showDiceIconsSetting.checked = settings.showDiceIcons;
+        applyShowDiceIcons(settings.showDiceIcons);
+        importedSettingsCount++;
+      }
+      if (typeof settings.clearAfterRoll === "boolean") {
+        localStorage.setItem(CLEAR_AFTER_ROLL_STORAGE_KEY, String(settings.clearAfterRoll));
+        clearAfterRoll = settings.clearAfterRoll;
+        els.clearAfterRollSetting.checked = clearAfterRoll;
+        importedSettingsCount++;
+      }
+      if (typeof settings.accentColor === "string" && HEX_COLOR_RE.test(settings.accentColor)) {
+        localStorage.setItem(ACCENT_COLOR_STORAGE_KEY, settings.accentColor);
+        els.accentColorSetting.value = settings.accentColor;
+        document.documentElement.style.setProperty("--accent", settings.accentColor);
+        importedSettingsCount++;
+      }
+      if (typeof settings.accentColor2 === "string" && HEX_COLOR_RE.test(settings.accentColor2)) {
+        localStorage.setItem(ACCENT_COLOR_2_STORAGE_KEY, settings.accentColor2);
+        els.accentColor2Setting.value = settings.accentColor2;
+        document.documentElement.style.setProperty("--accent-2", settings.accentColor2);
+        importedSettingsCount++;
+      }
+    }
+
+    if (importedD20.length === 0 && importedDamage.length === 0 && importedSettingsCount === 0) {
+      throw new Error("No saved rolls or settings found in that file.");
     }
 
     setStatus(
       els.globalStatus,
-      `Imported ${importedD20.length} d20 roll(s) and ${importedDamage.length} damage roll(s).`,
+      `Imported ${importedD20.length} d20 roll(s), ${importedDamage.length} damage roll(s), and ${importedSettingsCount} setting(s).`,
       false,
     );
   } catch (err) {
