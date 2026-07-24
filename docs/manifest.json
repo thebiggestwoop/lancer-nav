@@ -6,7 +6,7 @@
   "author": "thebiggestwoop",
   "description": "Roll Lancer d20 checks and damage dice, and post results to Discord.",
   "action": {
-    "title": "Lancer",
+    "title": "Lancer Nav",
     "icon": "/icon.svg",
     "popover": "/index.html",
     "height": 800,
