@@ -127,9 +127,3 @@ docs/               The Owlbear extension (static site, hosted via GitHub Pages)
   terms.html          Terms of Service
   privacy.html        Privacy Policy
 ```
-
-## Known limitations
-
-- **State is in-memory only, server-side.** Pairing codes and the Discord-side activity log reset if the bot process restarts.
-- **No cross-platform identity.** Discord and Owlbear have entirely separate identity systems; attribution from the extension (player name) is self-reported by the client, not cryptographically verified.
-- **The transport isn't authenticated beyond the pairing code.** Anyone who obtains a valid pairing code can post rolls to the linked channel through the bot — treat the code like a lightweight shared secret.
