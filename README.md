@@ -14,7 +14,6 @@ Legal: [Terms of Service](https://lancer-owlbear.heruv.uk/terms.html) · [Privac
 - [The Owlbear extension](#the-owlbear-extension)
 - [Architecture](#architecture)
 - [Repo layout](#repo-layout)
-- [Known limitations](#known-limitations)
 
 ---
 
